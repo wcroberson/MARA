@@ -474,7 +474,6 @@ class System(object):
         else:
             return raoff, deoff, vz
 
-
     def compute_model(self, params_arr, use_rebound=False):
         """
         Compute model predictions for an array of fitting parameters.
@@ -543,11 +542,12 @@ class System(object):
                 model[self.radec[body_num], 1] = decoff[self.radec[body_num], body_num, :]
 
             # Sep/PA
-            if len(self.seppa[body_num]) > 0:
-                sep, pa = radec2seppa(raoff, decoff)
+            # Commented out if statement since we need pas for star - 8/3/23
+            # if len(self.seppa[body_num]) > 0:
+            sep, pa = radec2seppa(raoff, decoff)
 
-                model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
-                model[self.seppa[body_num], 1] = pa[self.seppa[body_num], body_num, :]
+            model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
+            model[self.seppa[body_num], 1] = pa[self.seppa[body_num], body_num, :]
 
             # RV
             if len(self.rv[body_num]) > 0:
@@ -558,6 +558,15 @@ class System(object):
             model = model.reshape((n_epochs, 2))
             jitter = jitter.reshape((n_epochs, 2))
             gamma = gamma.reshape((n_epochs, 2))
+
+        # Below changes data products to be either delta sep for the two stars or np.nan
+        m1 = params_arr[-1]
+        m2 = params_arr[-3]
+
+        model[:, 0, :] = sep[:, 1, :] * m2 * np.cos(((pa[:, 1, :] - pa[:, 2, :]) * np.pi / 180)) / (m1 + m2)
+        model[self.seppa[2], 0] = np.nan
+        model[self.seppa[1], 1] = np.nan
+        model[self.seppa[2], 1] = np.nan
 
         if self.fit_secondary_mass:
             return model + gamma, jitter
