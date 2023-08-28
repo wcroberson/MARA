@@ -554,10 +554,6 @@ class System(object):
                 model[self.rv[body_num], 0] = vz[self.rv[body_num], body_num, :]
                 model[self.rv[body_num], 1] = np.nan
 
-        if n_orbits == 1:
-            model = model.reshape((n_epochs, 2))
-            jitter = jitter.reshape((n_epochs, 2))
-            gamma = gamma.reshape((n_epochs, 2))
 
         # Below changes data products to be either delta sep for the two stars or np.nan
         m1 = params_arr[-1]
@@ -568,17 +564,22 @@ class System(object):
         model[self.seppa[1], 1] = np.nan
         model[self.seppa[2], 1] = np.nan
 
-        print(pa[:, 1, :][:30])
-        print(pa[:, 2, :][:30])
-        print(sep[:, 1, :][:30])
-        print(m1)
-        print(m2)
-        print(model[:, 0, :][:30])
+        #print(pa[:, 1, :][:30])
+        #print(pa[:, 2, :][:30])
+        #print(sep[:, 1, :][:30])
+        #print(m1)
+        #print(m2)
+        #print(model[:, 0, :][:30])
+
+        if n_orbits == 1:
+            model = model.reshape((n_epochs, 2))
+            jitter = jitter.reshape((n_epochs, 2))
+            gamma = gamma.reshape((n_epochs, 2))
 
         if self.fit_secondary_mass:
-            return model + gamma, jitter+5
+            return model + gamma, jitter
         else:
-            return model, jitter+5
+            return model, jitter
 
     def convert_data_table_radec2seppa(self, body_num=1):
         """
