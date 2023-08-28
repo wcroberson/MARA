@@ -568,6 +568,13 @@ class System(object):
         model[self.seppa[1], 1] = np.nan
         model[self.seppa[2], 1] = np.nan
 
+        print(pa[:, 1, :][:30])
+        print(pa[:, 2, :][:30])
+        print(sep[:, 1, :][:30])
+        print(m1)
+        print(m2)
+        print(model[:, 0, :][:30])
+
         if self.fit_secondary_mass:
             return model + gamma, jitter
         else:
