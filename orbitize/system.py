@@ -576,9 +576,9 @@ class System(object):
         print(model[:, 0, :][:30])
 
         if self.fit_secondary_mass:
-            return model + gamma, jitter
+            return model + gamma, jitter+5
         else:
-            return model, jitter
+            return model, jitter+5
 
     def convert_data_table_radec2seppa(self, body_num=1):
         """
