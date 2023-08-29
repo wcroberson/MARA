@@ -564,13 +564,6 @@ class System(object):
         model[self.seppa[1], 1] = np.nan
         model[self.seppa[2], 1] = np.nan
 
-        #print(pa[:, 1, :][:30])
-        #print(pa[:, 2, :][:30])
-        #print(sep[:, 1, :][:30])
-        #print(m1)
-        #print(m2)
-        #print(model[:, 0, :][:30])
-
         if n_orbits == 1:
             model = model.reshape((n_epochs, 2))
             jitter = jitter.reshape((n_epochs, 2))
