@@ -385,7 +385,7 @@ class System(object):
                     within_orbit = np.where(all_smas <= sma)
                     outside_orbit = np.where(all_smas > sma)
                     all_pl_masses = params_arr[self.secondary_mass_indx]
-                    all_pl_masses[-1] = mass
+                    all_pl_masses[-1] = (4 * np.pi * (sma**3) / (all_pl_masses[-1]**2) / 39.476926408897626) - m0
                     inside_masses = all_pl_masses[within_orbit]
                     mtot = np.sum(inside_masses) + m0
 
