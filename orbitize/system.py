@@ -377,7 +377,7 @@ class System(object):
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
 
                     if body_num == 2:
-                        mass = (4 * np.pi * (sma**3) / (mass**2) / 39.476926408897626) - m0
+                        mass = (4 * np.pi**2 * (sma**3) / (mass**2) / 39.476926408897626) - m0
 
                     # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
                     # We need to select all planets with sma < this planet.
@@ -571,6 +571,10 @@ class System(object):
         model[self.seppa[2], 0] = np.nan
         model[self.seppa[1], 1] = np.nan
         model[self.seppa[2], 1] = np.nan
+
+        print(pa[:, 1, :])
+        print(pa[:, 2, :])
+        print(model[:, 0, :])
 
         if n_orbits == 1:
             model = model.reshape((n_epochs, 2))
