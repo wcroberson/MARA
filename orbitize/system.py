@@ -377,7 +377,7 @@ class System(object):
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
 
                     if body_num == 2:
-                        mass = (4 * np.pi**2 * (sma**3) / (mass**2) / 39.476926408897626) - m0
+                        mass = ((sma**3) / (mass**2)) - m0
 
                     # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
                     # We need to select all planets with sma < this planet.
@@ -385,7 +385,7 @@ class System(object):
                     within_orbit = np.where(all_smas <= sma)
                     outside_orbit = np.where(all_smas > sma)
                     all_pl_masses = params_arr[self.secondary_mass_indx]
-                    all_pl_masses[-1] = (4 * np.pi * (sma**3) / (all_pl_masses[-1]**2) / 39.476926408897626) - m0
+                    all_pl_masses[-1] = ((sma**3) / (all_pl_masses[-1]**2)) - m0
                     inside_masses = all_pl_masses[within_orbit]
                     mtot = np.sum(inside_masses) + m0
 
