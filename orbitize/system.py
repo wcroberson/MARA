@@ -368,6 +368,7 @@ class System(object):
                 tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
                 plx = params_arr[self.basis.standard_basis_idx['plx']]
 
+
                 if self.fit_secondary_mass:
                     # This if statement has been changed with a workaround so
                     # we can fit the secondary with period instead of mass
@@ -400,6 +401,10 @@ class System(object):
                     masses[body_num] = mass
                     mtots[body_num] = mtot
 
+                # The two lines below were added so sma is input in arcsecs and tau is input as epp
+                # They are changed here since sma is needed to convert between period and mass
+                sma *= 1000 / plx
+                tau = self.basis.tp_to_tau(tau, self.tau_ref_epoch, m2)
 
                 # solve Kepler's equation
                 raoff, decoff, vz_i = kepler.calc_orbit(
