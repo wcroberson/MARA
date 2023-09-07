@@ -1,4 +1,5 @@
 import numpy as np
+import pdb
 from orbitize import nbody, kepler, basis
 from astropy import table
 
@@ -367,7 +368,8 @@ class System(object):
                 lan = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
                 tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
                 plx = params_arr[self.basis.standard_basis_idx['plx']]
-
+                if body_num == 2:
+                    sma *= 1000 / plx
 
                 if self.fit_secondary_mass:
                     # This if statement has been changed with a workaround so
@@ -378,11 +380,13 @@ class System(object):
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
 
                     if body_num == 2:
+                        tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
                         mass = ((sma**3) / (mass**2)) - m0
 
                     # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
                     # We need to select all planets with sma < this planet.
                     all_smas = params_arr[self.sma_indx]
+                    all_smas[-1] *= 1000 / plx
                     within_orbit = np.where(all_smas <= sma)
                     outside_orbit = np.where(all_smas > sma)
                     all_pl_masses = params_arr[self.secondary_mass_indx]
@@ -400,11 +404,6 @@ class System(object):
                 if self.track_planet_perturbs:
                     masses[body_num] = mass
                     mtots[body_num] = mtot
-
-                # The two lines below were added so sma is input in arcsecs and tau is input as epp
-                # They are changed here since sma is needed to convert between period and mass
-                sma *= 1000 / plx
-                tau = self.basis.tp_to_tau(tau, self.tau_ref_epoch, m2)
 
                 # solve Kepler's equation
                 raoff, decoff, vz_i = kepler.calc_orbit(
