@@ -368,7 +368,7 @@ class System(object):
                 lan = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
                 tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
                 plx = params_arr[self.basis.standard_basis_idx['plx']]
-                if body_num == 2:
+                if body_num == 1:
                     sma *= 1000 / plx
 
                 if self.fit_secondary_mass:
@@ -379,18 +379,18 @@ class System(object):
                     mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
 
-                    if body_num == 2:
+                    if body_num == 1:
                         tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
                         mass = ((sma**3) / (mass**2)) - m0
 
                     # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
                     # We need to select all planets with sma < this planet.
                     all_smas = params_arr[self.sma_indx]
-                    all_smas[-1] *= 1000 / plx
+                    all_smas[0] *= 1000 / plx
                     within_orbit = np.where(all_smas <= sma)
                     outside_orbit = np.where(all_smas > sma)
                     all_pl_masses = params_arr[self.secondary_mass_indx]
-                    all_pl_masses[-1] = ((sma**3) / (all_pl_masses[-1]**2)) - m0
+                    all_pl_masses[0] = ((sma**3) / (all_pl_masses[0]**2)) - m0
                     inside_masses = all_pl_masses[within_orbit]
                     mtot = np.sum(inside_masses) + m0
 
@@ -569,9 +569,9 @@ class System(object):
 
         # Below changes data products to be either delta sep for the two stars or np.nan
         m1 = params_arr[-1]
-        m2 = params_arr[-3]
+        m2 = params_arr[-2]
 
-        model[:, 0, :] = sep[:, 1, :] * m2 * np.cos(((pa[:, 1, :] - pa[:, 2, :]) * np.pi / 180)) / (m1 + m2)
+        model[:, 0, :] = sep[:, 2, :] * m2 * np.cos(((pa[:, 2, :] - pa[:, 1, :]) * np.pi / 180)) / (m1 + m2)
         model[self.seppa[2], 0] = np.nan
         model[self.seppa[1], 1] = np.nan
         model[self.seppa[2], 1] = np.nan
