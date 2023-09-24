@@ -545,7 +545,7 @@ class System(object):
                 ]
                 gamma[self.rv_inst_indices[rv_idx], 1] = np.nan
 
-        for body_num in np.arange(self.num_secondary_bodies + 1):
+        '''for body_num in np.arange(self.num_secondary_bodies + 1):
 
             # for the model points that correspond to this planet's orbit, add the model prediction
             # RA/Dec
@@ -564,17 +564,30 @@ class System(object):
             # RV
             if len(self.rv[body_num]) > 0:
                 model[self.rv[body_num], 0] = vz[self.rv[body_num], body_num, :]
-                model[self.rv[body_num], 1] = np.nan
+                model[self.rv[body_num], 1] = np.nan'''
 
+        sep, pa = radec2seppa(raoff, decoff) # comment out loop above due to this line
+        m_primary = params_arr[-1]
+        total_mass = 0
+        for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:
+            m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
+            total_mass += m_planet
+            model[:, 0, :] += sep[:, body_num, :] * m_planet * \
+                              np.cos(((pa[:, body_num, :] - pa[:, 1, :]) * np.pi / 180))
+        total_mass += m_primary
+        model[:, 0, :] /= total_mass
+        model[:, 0] = np.nan
+        model[:, 1] = np.nan
+        model[:, 1] = np.nan
 
         # Below changes data products to be either delta sep for the two stars or np.nan
-        m1 = params_arr[-1]
+        '''m1 = params_arr[-1]
         m2 = params_arr[-2]
 
         model[:, 0, :] = sep[:, 2, :] * m2 * np.cos(((pa[:, 2, :] - pa[:, 1, :]) * np.pi / 180)) / (m1 + m2)
         model[self.seppa[2], 0] = np.nan
         model[self.seppa[1], 1] = np.nan
-        model[self.seppa[2], 1] = np.nan
+        model[self.seppa[2], 1] = np.nan'''
 
         if n_orbits == 1:
             model = model.reshape((n_epochs, 2))
