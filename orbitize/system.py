@@ -577,6 +577,14 @@ class System(object):
         total_mass += m_primary
         model[:, 0, :] /= total_mass
         model[:, 1] = np.nan
+        # Below sets model (and thus residuals) to inf if the smas are not ordered properly
+        if self.num_secondary_bodies > 2:
+            for body_num in np.arange(self.num_secondary_bodies)[2:]:
+                sma_planet1 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
+                sma_planet2 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num + 1)]]
+                if sma_planet2 < sma_planet1:
+                    model[:, 0, :] = np.inf
+
 
         # Below changes data products to be either delta sep for the two stars or np.nan
         '''m1 = params_arr[-1]
