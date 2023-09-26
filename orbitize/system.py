@@ -576,7 +576,6 @@ class System(object):
                               np.cos(((pa[:, body_num, :] - pa[:, 1, :]) * np.pi / 180))
         total_mass += m_primary
         model[:, 0, :] /= total_mass
-        print(model.shape)
         model[:, 1] = np.nan
 
         # Below changes data products to be either delta sep for the two stars or np.nan
