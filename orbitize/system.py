@@ -2,6 +2,7 @@ import numpy as np
 import pdb
 from orbitize import nbody, kepler, basis
 from astropy import table
+from radvel.orbit import timetrans_to_timeperi
 
 
 class System(object):
@@ -382,6 +383,12 @@ class System(object):
                     if body_num == 1:
                         tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
                         mass = ((sma**3) / (mass**2)) - m0
+                    else:
+                        period = np.sqrt(sma ** 3 / (mass + m0))
+                        # The following line actually calculates time of conjunction, because it is given tau_conj
+                        t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
+                        epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
+                        tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
 
                     # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
                     # We need to select all planets with sma < this planet.
