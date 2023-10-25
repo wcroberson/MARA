@@ -45,8 +45,8 @@ def set_priors(my_driver, param_file):
                                                                                             float(data[10]) * np.pi/180)
         my_driver.sampler.priors[my_driver.system.param_idx['tau1']] = priors.GaussianPrior(float(data[11]),
                                                                                             float(data[12]))
-        my_driver.sampler.priors[my_driver.system.param_idx['m1']] = priors.GaussianPrior(float(data[13]),
-                                                                                          float(data[14]))
+        my_driver.sampler.priors[my_driver.system.param_idx['m1']] = priors.GaussianPrior(float(data[15]),
+                                                                                          float(data[16]))
         for i in range(2, len(lines) - 2):
             my_driver.sampler.priors[my_driver.system.param_idx['sma' + str(i)]] = priors.UniformPrior(.1, 10)
             my_driver.sampler.priors[my_driver.system.param_idx['m' + str(i)]] = priors.UniformPrior(.000000001, .1)

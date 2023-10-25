@@ -81,7 +81,7 @@ def plot_corner(results, param_list=None, **corner_kwargs):
         'sig': '$\\sigma$ [km/s]',
         'mtot': '$M_T$ [M$_{{\\odot}}$]',
         'm0': '$M_0$ [M$_{{\\odot}}$]',
-        'm': '$M_{0}$ [M$_{{\\rm Jup}}$]',
+        'm': '$M_{0}$ [M$_{{\\rm Solar Mass}}$]',
         'pm_ra': '$\\mu_{{\\alpha}}$ [mas/yr]',
         'pm_dec': '$\\mu_{{\\delta}}$ [mas/yr]',
         'alpha0': '$\\alpha^{{*}}_{{0}}$ [mas]',
@@ -118,7 +118,7 @@ def plot_corner(results, param_list=None, **corner_kwargs):
     samples = np.copy(results.post[:, param_indices])  # keep only chains for selected parameters
     samples[:, angle_indices] = np.degrees(
         samples[:, angle_indices])  # convert angles from rad to deg
-    samples[:, secondary_mass_indices] *= u.solMass.to(u.jupiterMass) # convert to Jupiter masses for companions
+    #samples[:, secondary_mass_indices] *= u.solMass.to(u.jupiterMass) # convert to Jupiter masses for companions
 
     if 'labels' not in corner_kwargs:  # use default labels if user didn't already supply them
         reduced_labels_list = []
