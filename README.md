@@ -13,7 +13,7 @@ Getting Started:
 	> cd ..
 	> cp orbitize4toliman/scripts_and_data/* .
 4. Make a new conda environment (can ignore if not using conda venvs)
-	> conda create -f toliman_environment.yml
+	> conda env create -f toliman_environment.yml
 	> conda activate toliman
 5. You're now ready to run the script. The script has a number of required and optional command line arguments. Begin by running the following command
 	> python3 toliman_script.py --help
