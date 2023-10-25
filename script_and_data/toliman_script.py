@@ -53,7 +53,7 @@ def set_priors(my_driver, param_file):
     return
 
 
-def set_rand_pos(my_driver, param_file):
+def set_rand_pos(my_driver, param_file, check_priors=False):
     walker_centers = []
     walker_1sigmas = []
     with open(param_file, 'r') as f:
@@ -86,7 +86,6 @@ def set_rand_pos(my_driver, param_file):
         walker_1sigmas = np.array(walker_1sigmas)
 
         curr_pos_shape = my_driver.sampler.curr_pos.shape
-        print(walker_1sigmas)
 
         new_pos = np.random.standard_normal(curr_pos_shape) * walker_1sigmas + walker_centers
 
@@ -102,10 +101,11 @@ def set_rand_pos(my_driver, param_file):
         new_pos[:, :, cat_ind] = np.copy(my_driver.sampler.curr_pos[:, :, cat_ind])
 
     print('Position shape:', curr_pos_shape)
-    # Below can be uncommented to check spread of the initial points for finding prior errors
-    '''for i in range(len(walker_centers)):
-        print([my_driver.system.labels[i]])
-        print(np.min(new_pos[:, :, i]), np.max(new_pos[:, :, i]))'''
+
+    if check_priors:
+        for i in range(len(walker_centers)):
+            print([my_driver.system.labels[i]])
+            print(np.min(new_pos[:, :, i]), np.max(new_pos[:, :, i]))
     return new_pos
 
 
@@ -196,7 +196,7 @@ def main():
 
     # Assign optional parameters
     num_temps = 5 if '--num_temps' not in args else int(args[args.index('--num_temps') + 1])
-    num_walkers = 64 if '--num_walkers' not in args else int(args[args.index('--num_walkers') + 1])
+    num_walkers = 32 if '--num_walkers' not in args else int(args[args.index('--num_walkers') + 1])
     num_threads = mp.cpu_count() if '--num_threads' not in args else int(args[args.index('--num_threads') + 1])
     steps = 7500 if '--num_steps' not in args else int(args[args.index('--num_steps') + 1])
     load_file = None if '--load_file' not in args else args[args.index('--load_file') + 1]
