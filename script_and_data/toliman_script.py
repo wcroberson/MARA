@@ -53,7 +53,7 @@ def set_priors(my_driver, param_file):
     return
 
 
-def set_rand_pos(my_driver, param_file, check_priors=False):
+def set_rand_pos(my_driver, param_file, check_priors=True):
     walker_centers = []
     walker_1sigmas = []
     with open(param_file, 'r') as f:
