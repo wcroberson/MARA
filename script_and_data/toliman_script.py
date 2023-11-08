@@ -18,21 +18,26 @@ from astropy.time import Time
 from orbitize import priors, results
 
 
-def set_priors(my_driver, param_file):
+def set_priors(my_driver, param_file, swapAB=False):
     """
     Currently hard coded for Alpha Cen
     :param my_driver: driver for running MCMC
     :param param_file: csv file with stellar (and optionally planetary) parameters
+    :param  swapAB: a bool to determine which star the planet is orbiting, the primary (default) or the secondary
     :return: nothing, but modifies the parameters for my_driver
     """
     with open(param_file, 'r') as f:
         lines = f.readlines()
         data = lines[1].split(',')
-        my_driver.sampler.priors[my_driver.system.param_idx['m0']] = priors.GaussianPrior(float(data[13]),
-                                                                                          float(data[14]))
         my_driver.sampler.priors[my_driver.system.param_idx['plx']] = priors.GaussianPrior(float(data[17]),
                                                                                            float(data[18]))
+        if swapAB:
+            data = lines[2].split(',')
+        my_driver.sampler.priors[my_driver.system.param_idx['m0']] = priors.GaussianPrior(float(data[13]),
+                                                                                          float(data[14]))
         data = lines[2].split(',')
+        if swapAB:
+            data = lines[1].split(',')
         my_driver.sampler.priors[my_driver.system.param_idx['sma1']] = priors.GaussianPrior(float(data[1]),
                                                                                             float(data[2]))
         my_driver.sampler.priors[my_driver.system.param_idx['ecc1']] = priors.GaussianPrior(float(data[3]),
@@ -53,12 +58,14 @@ def set_priors(my_driver, param_file):
     return
 
 
-def set_rand_pos(my_driver, param_file, check_priors=True):
+def set_rand_pos(my_driver, param_file, check_priors=True, swapAB=False):
     walker_centers = []
     walker_1sigmas = []
     with open(param_file, 'r') as f:
         lines = f.readlines()
         data = lines[2].split(',')
+        if swapAB:
+            data = lines[1].split(',')
         walker_centers += [float(data[1]), float(data[3]), float(data[5]) * np.pi/180,
                            float(data[7]) * np.pi/180, float(data[9]) * np.pi/180, float(data[11])]
         walker_1sigmas += [float(data[2]), float(data[4]), float(data[6]) * np.pi/180,
@@ -79,8 +86,11 @@ def set_rand_pos(my_driver, param_file, check_priors=True):
             data = line.split(',')
             walker_centers += [float(data[13])]
             walker_1sigmas += [float(data[14])]
-        walker_centers += [float(lines[1].split(',')[13])]
-        walker_1sigmas += [float(lines[1].split(',')[14])]
+        data = lines[1].split(',')
+        if swapAB:
+            data = lines[2].split(',')
+        walker_centers += [float(data[13])]
+        walker_1sigmas += [float(data[14])]
 
         walker_centers = np.array(walker_centers)
         walker_1sigmas = np.array(walker_1sigmas)
@@ -110,7 +120,7 @@ def set_rand_pos(my_driver, param_file, check_priors=True):
 
 
 def run_mcmc(filename, param_file, num_temps=10, num_walkers=32, num_threads=mp.cpu_count(), load_file=None, steps=10000,
-             burn_steps=1000, thin=1):
+             burn_steps=1000, thin=1, swapAB=False):
 
     """
 
@@ -125,6 +135,7 @@ def run_mcmc(filename, param_file, num_temps=10, num_walkers=32, num_threads=mp.
     :param  steps: number of steps for MCMC
     :param  burn_steps: number of steps for the burn-in
     :param  thin: thinning parameter for MCMC
+    :param  swapAB: a bool to determine which star the planet is orbiting, the primary (default) or the secondary
     :return: No return, but results and corner plot are saved (will save orbit plot eventually)
     """
     # system parameters
@@ -132,10 +143,12 @@ def run_mcmc(filename, param_file, num_temps=10, num_walkers=32, num_threads=mp.
         lines = f.readlines()
         num_secondary_bodies = len(lines) - 3
         data = lines[1].split(',')
-        total_mass = float(data[13])  # [Msol]
         plx = float(data[17])  # [mas]
-        mass_err = float(data[14])  # [Msol]
         plx_err = float(data[18])  # [mas]
+        if swapAB:
+            data = lines[2].split(',')
+        total_mass = float(data[13])  # [Msol]
+        mass_err = float(data[14])  # [Msol]
 
     print('Creating Driver...')
     my_driver = driver.Driver(
@@ -147,9 +160,9 @@ def run_mcmc(filename, param_file, num_temps=10, num_walkers=32, num_threads=mp.
     print('Modifying priors and starting positions...')
     # Set priors and starting params
     # Will change to no longer be hard-coded eventually
-    set_priors(my_driver, param_file)
+    set_priors(my_driver, param_file, swapAB=swapAB)
 
-    new_pos = set_rand_pos(my_driver, param_file)
+    new_pos = set_rand_pos(my_driver, param_file, swapAB=swapAB)
 
     my_driver.sampler.curr_pos = np.copy(new_pos)
 
@@ -187,7 +200,7 @@ def main():
     if '--help' in args or len(args) == 0:
         print('Required parameters: data_filename parameter_filename')
         print('Optional parameters: --num_temps X --num_walkers X --num_threads X --load_file X')
-        print('                     --num_steps X --burn_steps X --thin X')
+        print('                     --num_steps X --burn_steps X --thin X --swapAB')
         return 0
     filename = args[0]
     param_file = args[1]
@@ -202,9 +215,10 @@ def main():
     load_file = None if '--load_file' not in args else args[args.index('--load_file') + 1]
     burn_steps = 1500 if '--burn_steps' not in args else int(args[args.index('--burn_steps') + 1])
     thin = 1 if '--thin' not in args else int(args[args.index('--thin') + 1])
+    swapAB = False if '--swapAB' not in args else True
 
     run_mcmc(filename, param_file, num_temps=num_temps, num_walkers=num_walkers, num_threads=num_threads,
-             load_file=load_file, steps=steps, burn_steps=burn_steps, thin=thin)
+             load_file=load_file, steps=steps, burn_steps=burn_steps, thin=thin, swapAB=swapAB)
     return 0
 
 
