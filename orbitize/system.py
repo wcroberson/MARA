@@ -384,6 +384,19 @@ class System(object):
                         tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
                         mass = ((sma**3) / (mass**2)) - m0
                     else:
+                        '''
+                        Changing basis to fit in period and Msin(mi_d) for the planets
+                        # The following line actually calculates time of conjunction, because it is given tau_conj
+                        t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
+                        epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
+                        tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
+                        
+                        mi_d = np.arccos(np.cos(np.pi/2)*np.cos(inc)+ np.sin(np.pi/2)*np.sin(inc)*
+                        np.cos((120*np.pi/180)-pan))  # 120 degrees is only roughly right, should think about doing it more rigorously
+                        mass /= np.sin(mi_d)
+                        
+                        sma = (sma**2 * (mass + m0))**(1/3)
+                        '''
                         period = np.sqrt(sma ** 3 / (mass + m0))
                         # The following line actually calculates time of conjunction, because it is given tau_conj
                         t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
@@ -517,7 +530,6 @@ class System(object):
                 np.array of float: Nobsx2xM array jitter predictions. If M=1, this is
                     a 2d array, otherwise it is a 3d array.
         """
-
         to_convert = np.copy(params_arr)
         standard_params_arr = self.basis.to_standard_basis(to_convert)
 
@@ -584,6 +596,7 @@ class System(object):
         total_mass += m_primary
         model[:, 0, :] /= total_mass
         model[:, 1] = np.nan
+
         # Below sets model (and thus residuals) to inf if the smas are not ordered properly
         if self.num_secondary_bodies > 2:
             for body_num in np.arange(self.num_secondary_bodies)[2:]:
