@@ -619,7 +619,10 @@ class System(object):
             pan_planet = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
             mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc_planet) +
                              np.sin(np.pi / 2) * np.sin(inc_planet) * np.cos((107.7 * np.pi / 180) - pan_planet))
-            m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
+            if use_msinmid_basis:
+                m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
+            else:
+                m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
 
             total_mass += m_planet
 
