@@ -47,7 +47,7 @@ def tau_to_manom(date, sma, mtot, tau, tau_ref_epoch):
 
 def calc_orbit(
   epochs, sma, ecc, inc, aop, pan, tau, plx, mtot, mass_for_Kamp=None, tau_ref_epoch=58849, tolerance=1e-9, 
-  max_iter=100, use_c=True, use_gpu=False
+  max_iter=100, use_c=True, use_gpu=False, const_plx=True
 ):
 
     """
@@ -123,6 +123,15 @@ def calc_orbit(
     s1 = np.sin(arg1)
     s2 = np.sin(arg2)
 
+    # Added to give the option to make parallax a (linear) function of time
+    if not const_plx:
+        # Need to change plx from scalar to array with same length as epochs
+        # Treat given parallax as the parallax on the first observation date
+        plx_dot = 0.013
+        delta_ts_days = epochs - epochs[0]
+        delta_ts_yrs = delta_tx_years / 365.24
+        delta_plxs = delta_ts_yrs * plx_dot
+        plx = plx + delta_plxs
     # updated sign convention for Green Eq. 19.4-19.7
     raoff = radius * (c2i2*s1 - s2i2*s2) * plx
     deoff = radius * (c2i2*c1 + s2i2*c2) * plx

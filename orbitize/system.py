@@ -284,7 +284,8 @@ class System(object):
         hf.attrs['fitting_basis'] = self.fitting_basis
         hf.attrs['use_rebound'] = self.use_rebound
 
-    def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=True):
+    def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=True,
+                           const_plx=True):
         """
         Calls orbitize.kepler.calc_orbit and optionally accounts for multi-body
         interactions. Also computes total quantities like RV (without jitter/gamma)
@@ -531,7 +532,8 @@ class System(object):
         else:
             return raoff, deoff, vz
 
-    def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=True):
+    def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=True,
+                      const_plx=True):
         """
         Compute model predictions for an array of fitting parameters.
         Calls the above compute_all_orbits() function, adds jitter/gamma to
