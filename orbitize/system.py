@@ -454,7 +454,7 @@ class System(object):
                 # solve Kepler's equation
                 raoff, decoff, vz_i = kepler.calc_orbit(
                     epochs, sma, ecc, inc, argp, lan, tau, plx, mtot,
-                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch
+                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch, const_plx=const_plx
                 )
 
                 # raoff, decoff, vz are scalers if the length of epochs is 1
@@ -562,9 +562,10 @@ class System(object):
 
         if use_rebound:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, comp_rebound=True,
-                                                        use_msinmid_basis=use_msinmid_basis)
+                                                        use_msinmid_basis=use_msinmid_basis, const_plx=const_plx)
         else:
-            raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, use_msinmid_basis=use_msinmid_basis)
+            raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, use_msinmid_basis=use_msinmid_basis,
+                                                        const_plx=const_plx)
 
         if len(standard_params_arr.shape) == 1:
             n_orbits = 1

@@ -129,7 +129,7 @@ def calc_orbit(
         # Treat given parallax as the parallax on the first observation date
         plx_dot = 0.013
         delta_ts_days = epochs - epochs[0]
-        delta_ts_yrs = delta_tx_years / 365.24
+        delta_ts_yrs = delta_ts_days / 365.24
         delta_plxs = delta_ts_yrs * plx_dot
         plx = plx + delta_plxs
     # updated sign convention for Green Eq. 19.4-19.7
