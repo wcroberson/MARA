@@ -532,8 +532,8 @@ class System(object):
         else:
             return raoff, deoff, vz
 
-    def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=True,
-                      const_plx=True):
+    def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=False,
+                      const_plx=True, model_AB_sep=True):
         """
         Compute model predictions for an array of fitting parameters.
         Calls the above compute_all_orbits() function, adds jitter/gamma to
@@ -631,14 +631,17 @@ class System(object):
 
             if fix_pa:
                 model[:, 0, :] += sep[:, body_num, :] * m_planet * \
-                                  np.cos(((pa[:, body_num, :] - 107.7) * np.pi / 180))  # CHANGE 107.7 BACK TO pa[:, 1, :]
+                                  np.cos(((pa[:, body_num, :] - 107.7) * np.pi / 180))
             else:
                 model[:, 0, :] += sep[:, body_num, :] * m_planet * \
                                   np.cos(((pa[:, body_num, :] - pa[:, 1,
-                                                                :]) * np.pi / 180))  # CHANGE 107.7 BACK TO pa[:, 1, :]
+                                                                :]) * np.pi / 180))
         total_mass += m_primary
         model[:, 0, :] /= total_mass
         model[:, 1] = np.nan
+
+        if fit_AB_sep:
+            model[:, 0, :] += sep[:, 1, :]
 
         # Below sets model (and thus residuals) to inf if the smas are not ordered properly
         if self.num_secondary_bodies > 2:

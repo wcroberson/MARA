@@ -122,7 +122,6 @@ def calc_orbit(
     c2 = np.cos(arg2)
     s1 = np.sin(arg1)
     s2 = np.sin(arg2)
-
     # Added to give the option to make parallax a (linear) function of time
     if not const_plx:
         # Need to change plx from scalar to array with same length as epochs
