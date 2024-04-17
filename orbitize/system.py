@@ -640,7 +640,7 @@ class System(object):
         model[:, 0, :] /= total_mass
         model[:, 1] = np.nan
 
-        if fit_AB_sep:
+        if model_AB_sep:
             model[:, 0, :] += sep[:, 1, :]
 
         # Below sets model (and thus residuals) to inf if the smas are not ordered properly
