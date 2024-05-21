@@ -368,7 +368,6 @@ class System(object):
             for body_num in np.arange(self.num_secondary_bodies)+1:
 
                 sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
-                print(body_num, sma)
                 ecc = params_arr[self.basis.standard_basis_idx['ecc{}'.format(body_num)]]
                 inc = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
                 argp = params_arr[self.basis.standard_basis_idx['aop{}'.format(body_num)]]

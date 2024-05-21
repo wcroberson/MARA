@@ -112,7 +112,6 @@ def calc_orbit(
     tanom = 2.*np.arctan(np.sqrt((1.0 + ecc)/(1.0 - ecc))*np.tan(0.5*eanom))
     # compute 3-D orbital radius of second body (size: n_orbs x n_dates)
     radius = sma * (1.0 - ecc * np.cos(eanom))
-    print(sma)
 
     # compute ra/dec offsets (size: n_orbs x n_dates)
     # math from James Graham. Lots of trig
