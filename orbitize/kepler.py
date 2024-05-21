@@ -47,7 +47,7 @@ def tau_to_manom(date, sma, mtot, tau, tau_ref_epoch):
 
 def calc_orbit(
   epochs, sma, ecc, inc, aop, pan, tau, plx, mtot, mass_for_Kamp=None, tau_ref_epoch=58849, tolerance=1e-9, 
-  max_iter=100, use_c=True, use_gpu=False, const_plx=True
+  max_iter=100, use_c=True, use_gpu=False, const_plx=True, return_z=False
 ):
 
     """
@@ -75,6 +75,7 @@ def calc_orbit(
         max_iter (int, optional): maximum number of iterations before switching. Defaults to 100.
         use_c (bool, optional): Use the C solver if configured. Defaults to True
         use_gpu (bool, optional): Use the GPU solver if configured. Defaults to False
+        return_z (bool, optional): If True, returns only the z coordinate and no raoff, deoff, or vz
 
     Return:
         3-tuple:
@@ -111,6 +112,7 @@ def calc_orbit(
     tanom = 2.*np.arctan(np.sqrt((1.0 + ecc)/(1.0 - ecc))*np.tan(0.5*eanom))
     # compute 3-D orbital radius of second body (size: n_orbs x n_dates)
     radius = sma * (1.0 - ecc * np.cos(eanom))
+    print(sma)
 
     # compute ra/dec offsets (size: n_orbs x n_dates)
     # math from James Graham. Lots of trig
@@ -122,6 +124,14 @@ def calc_orbit(
     c2 = np.cos(arg2)
     s1 = np.sin(arg1)
     s2 = np.sin(arg2)
+
+    if return_z:
+        z = np.zeros([2, n_dates])
+        z[0, :] = -1*(np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * radius * (mtot-mass_for_Kamp) / mtot
+
+        z[1, :] = 1*(np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * radius * mass_for_Kamp / mtot
+
+        return z
     # Added to give the option to make parallax a (linear) function of time
     if not const_plx:
         # Need to change plx from scalar to array with same length as epochs
@@ -147,6 +157,7 @@ def calc_orbit(
     # Squeeze out extra dimension (useful if n_orbs = 1, does nothing if n_orbs > 1)
     vz = np.squeeze(vz)[()]
     return raoff, deoff, vz
+
 
 def _calc_ecc_anom(manom, ecc, tolerance=1e-9, max_iter=100, use_c=False, use_gpu=False):
     """

@@ -284,8 +284,8 @@ class System(object):
         hf.attrs['fitting_basis'] = self.fitting_basis
         hf.attrs['use_rebound'] = self.use_rebound
 
-    def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=True,
-                           const_plx=True):
+    def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=False,
+                           const_plx=False, gen_data_for_gautam=False):
         """
         Calls orbitize.kepler.calc_orbit and optionally accounts for multi-body
         interactions. Also computes total quantities like RV (without jitter/gamma)
@@ -368,6 +368,7 @@ class System(object):
             for body_num in np.arange(self.num_secondary_bodies)+1:
 
                 sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
+                print(body_num, sma)
                 ecc = params_arr[self.basis.standard_basis_idx['ecc{}'.format(body_num)]]
                 inc = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
                 argp = params_arr[self.basis.standard_basis_idx['aop{}'.format(body_num)]]
@@ -478,7 +479,7 @@ class System(object):
             # We are superimposing the Keplerian orbits, so we can add it linearly, scaled by the mass.
             # Because we are in Jacobi coordinates, for companions, we only should model the effect of planets interior to it.
             # (Jacobi coordinates mean that separation for a given companion is measured relative to the barycenter of all interior companions)
-            if self.track_planet_perturbs:
+            '''if self.track_planet_perturbs:
                 for body_num in np.arange(self.num_secondary_bodies + 1):
 
                     if body_num > 0:
@@ -506,18 +507,74 @@ class System(object):
 
                         # star is perturbed in opposite direction
                         if other_body_num == 0:
+                            #print('perturb mtot', mtots[body_num])
+                            #print('primary mass ratio', masses[body_num] / mtots[body_num])
                             ra_perturb[:, other_body_num, :] -= (masses[body_num]/mtots[body_num]) * ra_kepler[:, body_num, :]
                             dec_perturb[:, other_body_num, :] -= (masses[body_num]/mtots[body_num]) * dec_kepler[:, body_num, :]
 
                         else:
+                            #print('mass ratio', masses[body_num]/mtots[body_num])
                             ra_perturb[:, other_body_num, :] += (masses[body_num]/mtots[body_num]) * ra_kepler[:, body_num, :]
                             dec_perturb[:, other_body_num, :] += (masses[body_num]/mtots[body_num]) * dec_kepler[:, body_num, :]
-
+'''  # Removed because it resets sma and I needed to prevent for a test on 5-21-2024
             # Modified for TOLIMAN project
             # Removed perturbations for easier calculation in 1 planet system, will need to
             # think through for more planets
             raoff = ra_kepler  # + ra_perturb
             deoff = dec_kepler  # + dec_perturb
+
+        if gen_data_for_gautam:
+            #print('ra before perturb', raoff)
+            #print('dec before perturb', deoff)
+            #print('ra kepler', ra_kepler[:, 0, 0])
+            #print('ra perturb', ra_perturb[:, 0, 0])
+            #print('ra sum', ra_kepler[:, 0, 0] + ra_perturb[:, 0, 0])
+            # Get ra and dec offsets from center of mass for both bodies
+            raoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits)) # N_epochs x N_bodies x N_orbits
+            deoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
+            raoff[:, 1, 0] = ra_kepler[:, 1, 0] * (m0 / mtot)
+            deoff[:, 1, 0] = dec_kepler[:, 1, 0] * (m0 / mtot)
+            raoff[:, 0, 0] = -ra_kepler[:, 1, 0] * (mtot - m0) / mtot
+            deoff[:, 0, 0] = -dec_kepler[:, 1, 0] * (mtot - m0) / mtot
+            #print(raoff[:, 0, :])
+            #print('ra kepler', ra_kepler[:, 0, 0])
+            #print('ra perturb', ra_perturb[:, 0, 0])
+            #print('ra sum', ra_kepler[:, 0, 0]+ra_perturb[:, 0, 0])
+
+            #print('ra after perturb', raoff)
+            #print('dec after perturb', deoff)
+            #print('ra perturb', ra_perturb)
+            #print('dec perturb', dec_perturb)
+            #print('raoff ratio', raoff[:, 0, 0]/raoff[:, 1, 0])
+            #print('decoff ratio', deoff[:, 0, 0] / deoff[:, 1, 0])
+            if not const_plx:
+                # Need to change plx from scalar to array with same length as epochs
+                # Treat given parallax as the parallax on the first observation date
+                plx_dot = 0.013
+                delta_ts_days = epochs - epochs[0]
+                delta_ts_yrs = delta_ts_days / 365.24
+                delta_plxs = delta_ts_yrs * plx_dot
+                plx = plx + delta_plxs
+            d = np.zeros(raoff.shape)
+            #print('mtot for z', mtot)
+            #print('m for kamp for z', m0)
+            #print('m1', mtot-m0)
+            z = kepler.calc_orbit(
+                    epochs, sma, ecc, inc, argp, lan, tau, plx, mtot,
+                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch, const_plx=True,
+                    return_z=True)
+            d[:, 1, 0] = (z[1, :] * 4.848102 * 10**-6)
+            d[:, 0, 0] = (z[0, :] * 4.848102 * 10**-6)
+            raoff *= (1 / (3.6 * 10**6)) * (np.pi / 180) * (1000 / plx)
+            deoff *= (1 / (3.6 * 10**6)) * (np.pi / 180) * (1000 / plx)
+            #print('mean raoff:', np.mean(raoff))
+            #print(raoff)
+            #print('mean decoff:', np.mean(deoff))
+            #print(deoff)
+            #print(d)
+            return raoff, deoff, d
+
+
 
         if self.fitting_basis == 'XYZ':
             # Find and filter out unbound orbits
@@ -533,7 +590,7 @@ class System(object):
             return raoff, deoff, vz
 
     def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=False,
-                      const_plx=True, model_AB_sep=True):
+                      const_plx=True, model_AB_sep=False):
         """
         Compute model predictions for an array of fitting parameters.
         Calls the above compute_all_orbits() function, adds jitter/gamma to
