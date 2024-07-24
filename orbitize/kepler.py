@@ -4,6 +4,7 @@ This module solves for the orbit of the planet given Keplerian parameters.
 import numpy as np
 import astropy.units as u
 import astropy.constants as consts
+from copy import deepcopy
 
 from orbitize import cuda_ext, cext
 
@@ -47,7 +48,7 @@ def tau_to_manom(date, sma, mtot, tau, tau_ref_epoch):
 
 def calc_orbit(
   epochs, sma, ecc, inc, aop, pan, tau, plx, mtot, mass_for_Kamp=None, tau_ref_epoch=58849, tolerance=1e-9, 
-  max_iter=100, use_c=True, use_gpu=False, const_plx=True, return_z=False
+  max_iter=100, use_c=True, use_gpu=False, const_plx=True, return_z=False, return_cartesian=False
 ):
 
     """
@@ -76,6 +77,9 @@ def calc_orbit(
         use_c (bool, optional): Use the C solver if configured. Defaults to True
         use_gpu (bool, optional): Use the GPU solver if configured. Defaults to False
         return_z (bool, optional): If True, returns only the z coordinate and no raoff, deoff, or vz
+        return_cartesian (bool, optional): If True, returns raoff, decoff, and zoff, all in a cartesian
+            coordinate system. Meant to be used to perform higher order corrections like perspective
+            change and speed of light effects.
 
     Return:
         3-tuple:
@@ -143,6 +147,27 @@ def calc_orbit(
     # updated sign convention for Green Eq. 19.4-19.7
     raoff = radius * (c2i2*s1 - s2i2*s2) * plx
     deoff = radius * (c2i2*c1 + s2i2*c2) * plx
+
+    if return_cartesian:
+        zoff = np.zeros(raoff.shape)
+        #zoff[0, :] = -1 * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) \
+        #          * radius * (mtot - mass_for_Kamp) / mtot
+
+        #zoff[1, :] = 1 * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) \
+        #          * radius * mass_for_Kamp / mtot
+        #zoff *= 4.848102 * 10**-6
+        zoff = deepcopy(radius) * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * (1 / (3.6 * 10 ** 3)) * (np.pi / 180)
+        #tmp_ra = deepcopy(raoff)
+        tmp_dec = deepcopy(deoff)
+        #raoff = np.zeros([2, n_dates])
+        #deoff = np.zeros([2, n_dates])
+        #raoff[1, :] = tmp_ra * (mass_for_Kamp / mtot)
+        #deoff[1, :] = tmp_dec * (mass_for_Kamp / mtot)
+        #raoff[0, :] = -tmp_ra * (mtot - mass_for_Kamp) / mtot
+        #deoff[0, :] = -tmp_dec * (mtot - mass_for_Kamp) / mtot
+        raoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
+        deoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
+        return raoff, deoff, zoff
 
     # compute the radial velocity (vz) of the body (size: n_orbs x n_dates)
     # first comptue the RV semi-amplitude (size: n_orbs x n_dates)

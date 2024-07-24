@@ -91,13 +91,12 @@ class Sampler(abc.ABC):
         if self.system.hipparcos_IAD is not None:
 
             # compute Ra/Dec predictions at the Hipparcos IAD epochs
-            raoff_model, deoff_model, _ = self.system.compute_all_orbits(
-                params, epochs=self.system.hipparcos_IAD.epochs_mjd
-            ) 
+            raoff_model, deoff_model, _ = self.system.compute_all_orbits(params,
+                                                                         epochs=self.system.hipparcos_IAD.epochs_mjd)
 
-            raoff_model_hip_epoch, deoff_model_hip_epoch, _ = self.system.compute_all_orbits(
-                params, epochs=Time([1991.25], format='decimalyear').mjd
-            ) 
+            raoff_model_hip_epoch, deoff_model_hip_epoch, _ = self.system.compute_all_orbits(params,
+                                                                                             epochs=Time([1991.25],
+                                                                                                         format='decimalyear').mjd)
 
             # subtract off position of star at reference Hipparcos epoch
             raoff_model[:,0,:] -= raoff_model_hip_epoch[:,0,:]
@@ -116,9 +115,7 @@ class Sampler(abc.ABC):
                 ).mjd
 
                 # compute Ra/Dec predictions at the Gaia epoch
-                raoff_model, deoff_model, _ = self.system.compute_all_orbits(
-                    params, epochs=gaiahip_epochs
-                ) 
+                raoff_model, deoff_model, _ = self.system.compute_all_orbits(params, epochs=gaiahip_epochs)
 
                 # select body 0 raoff/deoff predictions & feed into Gaia module lnlike fn
                 lnlikes_sum += self.system.gaia.compute_lnlike(

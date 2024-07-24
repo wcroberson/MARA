@@ -10,6 +10,7 @@ from astropy.time import Time
 from astropy.coordinates import get_body_barycentric_posvel
 from astroquery.vizier import Vizier
 
+
 class HipparcosLogProb(object):
     """
     Class to compute the log probability of an orbit with respect to the 
@@ -124,7 +125,6 @@ class HipparcosLogProb(object):
 
             solution_type = solution_details['isol_n'].values[0]
             f2 = solution_details['F2'].values[0]
-
 
         if solution_type != 5:
             raise ValueError(
@@ -293,6 +293,7 @@ class HipparcosLogProb(object):
         lnlike = -0.5 * chi2
 
         return lnlike
+
 
 def nielsen_iad_refitting_test(
     iad_file, hip_num='027321', saveplot='bPic_IADrefit.png', 
