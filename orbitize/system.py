@@ -288,8 +288,7 @@ class System(object):
         hf.attrs['use_rebound'] = self.use_rebound
 
     def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=False,
-                           const_plx=True, gen_data_for_gautam=False, corrections=False, pm_only_correction=False,
-                           com_test=False, const_dec=False, solc=True):
+                           full_orbit_model=False):
         """
         Calls orbitize.kepler.calc_orbit and optionally accounts for multi-body
         interactions. Also computes total quantities like RV (without jitter/gamma)
@@ -309,7 +308,7 @@ class System(object):
                 assume it is given period and m*sin(mi_d) to fit instead of sma
                 and m. Defaults to True, can be set to False for calculating
                 orbits from old results.
-            corrections (bool, optional): If True, will model higher order corrections such as perspective
+            full_orbit_model (bool, optional): If True, will model higher order full_orbit_model such as perspective
                 changes and speed of light effects when calculating the positions of the binary
 
         Returns:
@@ -370,7 +369,7 @@ class System(object):
 
             raoff, deoff, vz = nbody.calc_orbit(epochs, sma, ecc, inc, argp, lan, tau, plx, mtot, tau_ref_epoch=self.tau_ref_epoch, m_pl=m_pl, output_star=True)
 
-        elif not corrections:
+        elif not full_orbit_model:
             for body_num in np.arange(self.num_secondary_bodies)+1:
 
                 sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
@@ -527,7 +526,7 @@ class System(object):
             # think through for more planets
             raoff = ra_kepler  # + ra_perturb
             deoff = dec_kepler  # + dec_perturb
-        elif corrections:
+        elif full_orbit_model:
             body_num = 1
             my206265 = 180 / np.pi * 60 * 60
             sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
@@ -592,7 +591,7 @@ class System(object):
                 masses[body_num] = mass
                 mtots[body_num] = mtot
 
-            # Here we do the first steps in perspective and light_timing corrections
+            # Here we do the first steps in perspective and light_timing correction
             # We begin by finding the correction (shared by both stars) due to system proper motion
             # We then correct for the orbital motion, still considering changing perspective
             # CURRENTLY THIS IS ASSUMING THERE ARE ONLY TWO BODIES
@@ -625,76 +624,8 @@ class System(object):
                                                                         dec_com_i, ref_epoch, 0, 0, 0)
 
             d1 = 1 / np.tan(parallax1 / 1000 / my206265) / my206265
-            #print(d1)
+
             t1 = light_timing_correction_iteration(t0, d0, d1)
-            #t1 += -0.00023845746225836795
-            #print(t1 - t0)
-
-            if pm_only_correction:
-                ra1, dec1, parallax1, pmra1, pmdec1, rv1 = transform_motion(t1, ra_com_i, dec_com_i,
-                                                                            plx_com_i, pmra_com_i, pmdec_com_i,
-                                                                            rv_com_i, 0, 0, 0, ra_com_i,
-                                                                            dec_com_i, ref_epoch, 0, 0, 0)
-                raoff, decoff, zoff = kepler.calc_orbit(
-                    np.append(t1, ref_epoch), sma, ecc, inc, argp, lan, tau, plx, mtot,
-                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch, const_plx=True,
-                    return_cartesian=False
-                )
-                if com_test:
-                    sec2year = 365.25 * 24 * 60 * 60
-                    pc2km = 3.08567758149137e13
-                    ddec = pmdec_com_i / 1000 / 3600
-                    del_epochs = (t1 - ref_epoch) / 365.24
-                    dec = dec_com_i + (ddec * del_epochs)
-                    cosdec = np.cos(dec * np.pi / 180) if not const_dec else np.cos(dec_com_i * np.pi / 180)
-                    dra_i = pmra_com_i / 1000 / 3600 / np.cos(dec_com_i * np.pi / 180)
-                    dra = pmra_com_i / 1000 / 3600 / cosdec  # np.cos(dec_com_i * np.pi / 180)
-                    import matplotlib.pyplot as plt
-                    plt.figure()
-                    print(epochs.shape)
-                    #plt.plot(del_epochs, (dra_i * del_epochs) + 0.5 * (dra - dra_i) * del_epochs)
-                    #plt.plot(del_epochs, (dra_i * del_epochs))
-                    plt.plot(del_epochs, 0.5 * (dra - dra_i) * del_epochs)
-                    #plt.axvline(ref_epoch)
-                    #plt.axvline(epochs[350], color='black')
-                    #plt.axhline(dra[350], color='black')
-                    plt.show()
-                    return ra_com_i + (dra_i * del_epochs) + 0.5 * (dra - dra_i) * del_epochs, dec, np.zeros(dec.shape)
-
-                orbit_xp[:, 0, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)/ 1000 / 3600/ np.cos(dec_com_i * np.pi / 180)
-                orbit_yp[:, 0, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)/ 1000 / 3600
-                orbit_zp[:, 0, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)/ 1000 / 3600
-                orbit_xp[:, 1, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)/ 1000 / 3600/ np.cos(dec_com_i * np.pi / 180)
-                orbit_yp[:, 1, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)/ 1000 / 3600
-                orbit_zp[:, 1, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)/ 1000 / 3600
-                ra_A_i, dec_A_i, plx_A_i = 219.859327684554, -60.83226122126384, 750.8446829101989
-                ra_B_i, dec_B_i, plx_B_i = 219.85844101788732, -60.83088538793051, 750.7774844691439
-                sec2year = 365.25 * 24 * 60 * 60
-                pc2km = 3.08567758149137e13
-                cosdec = np.cos(dec1 * np.pi / 180)
-                dra_i = pmra_com_i / 1000 / 3600 / np.cos(dec_com_i)
-                dra = pmra_com_i / 1000 / 3600 / cosdec  # np.cos(dec_com_i * np.pi / 180)
-                ddec = pmdec_com_i / 1000 / 3600
-                # ddist = rv_com_i / pc2km * sec2year
-                del_epochs = (t1 - ref_epoch) / 365.24
-                raA = ra_A_i + (dra_i * del_epochs) + 0.5 * ((dra - dra_i) * del_epochs) + (
-                        orbit_xp[:-1, 0, 0] - orbit_xp[-1, 0, 0])
-                raB = ra_B_i + (dra_i * del_epochs) + 0.5 * ((dra - dra_i) * del_epochs) + (
-                        orbit_xp[:-1, 0, 0] - orbit_xp[-1, 0, 0])
-                decA = dec_A_i + (ddec * del_epochs) + (orbit_yp[:-1, 0, 0] - orbit_yp[-1, 0, 0])
-                decB = dec_B_i + (ddec * del_epochs) + (orbit_yp[:-1, 1, 0] - orbit_yp[-1, 1, 0])
-
-                return raA, decA, 0, raB, decB, 0
-
-            if com_test:
-                if not solc:
-                    t1 = deepcopy(t0)
-                ra1, dec1, parallax1, pmra1, pmdec1, rv1 = transform_motion(t1, ra_com_i,
-                                                                            dec_com_i,
-                                                                            plx_com_i, pmra_com_i, pmdec_com_i,
-                                                                            rv_com_i, 0, 0, 0, ra_com_i,
-                                                                            dec_com_i, ref_epoch, 0, 0, 0)
-                return ra1, dec1, parallax1#, pmra1, pmdec1, rv1
 
             # Now we do the same correction for orbital motion, which we must do separately for each star
             # I need to get these values from the com of mass values and orbital parameters
@@ -722,7 +653,7 @@ class System(object):
                                                            orbit_yp[-1, 0, 0], orbit_zp[-1, 0, 0])
             ra_A_i, dec_A_i, plx_A_i, _, _, _ = xyz2radecz(orbit_x_ref + x_com_i, orbit_y_ref + y_com_i,
                                                            orbit_z_ref + z_com_i, 0, 0, 0)
-            ra_A_i, dec_A_i, plx_A_i = 219.859327684554, -60.83226122126384, 750.8446829101989
+
             raA2, decA2, parallaxA2, pmraA2, pmdecA2, rvA2 = transform_motion(t1, ra_A_i, dec_A_i,
                                                                               plx_A_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
@@ -732,12 +663,25 @@ class System(object):
                                                                               orbit_xp[-1, 0, 0],
                                                                               orbit_yp[-1, 0, 0],
                                                                               orbit_zp[-1, 0, 0])
+            # Now we do the SOLC for A individually
+            dA2 = 1 / np.tan(parallaxA2 / 1000 / my206265) / my206265
+            tA2 = light_timing_correction_iteration(t1, d1, dA2)
+            raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3 = transform_motion(tA2, ra_A_i, dec_A_i,
+                                                                              plx_A_i, pmra_com_i, pmdec_com_i,
+                                                                              rv_com_i,
+                                                                              orbit_xp[:-1, 0, 0], orbit_yp[:-1, 0, 0],
+                                                                              orbit_zp[:-1, 0, 0], ra_com_i,
+                                                                              dec_com_i, ref_epoch,
+                                                                              orbit_xp[-1, 0, 0],
+                                                                              orbit_yp[-1, 0, 0],
+                                                                              orbit_zp[-1, 0, 0])
+
             # Now we repeat the above process, this time for B
             orbit_x_ref, orbit_y_ref, orbit_z_ref = rotate(ra_com_i, dec_com_i, orbit_xp[-1, 1, 0],
                                                            orbit_yp[-1, 1, 0], orbit_zp[-1, 1, 0])
             ra_B_i, dec_B_i, plx_B_i, _, _, _ = xyz2radecz(orbit_x_ref + x_com_i, orbit_y_ref + y_com_i,
                                                            orbit_z_ref + z_com_i, 0, 0, 0)
-            ra_B_i, dec_B_i, plx_B_i = 219.85844101788732, -60.83088538793051, 750.7774844691439
+
             raB2, decB2, parallaxB2, pmraB2, pmdecB2, rvB2 = transform_motion(t1, ra_B_i, dec_B_i,
                                                                               plx_B_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
@@ -747,35 +691,21 @@ class System(object):
                                                                               orbit_xp[-1, 1, 0],
                                                                               orbit_yp[-1, 1, 0],
                                                                               orbit_zp[-1, 1, 0])
+            dB2 = 1 / np.tan(parallaxB2 / 1000 / my206265) / my206265
+            tB2 = light_timing_correction_iteration(t1, d1, dA2)
+            raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3 = transform_motion(tB2, ra_B_i, dec_B_i,
+                                                                              plx_B_i, pmra_com_i, pmdec_com_i,
+                                                                              rv_com_i,
+                                                                              orbit_xp[:-1, 1, 0], orbit_yp[:-1, 1, 0],
+                                                                              orbit_zp[:-1, 1, 0], ra_com_i,
+                                                                              dec_com_i, ref_epoch,
+                                                                              orbit_xp[-1, 1, 0],
+                                                                              orbit_yp[-1, 1, 0],
+                                                                              orbit_zp[-1, 1, 0])
+
+
 
             return raA2, decA2, parallaxA2, raB2, decB2, parallaxB2
-
-        if gen_data_for_gautam:
-            # Get ra and dec offsets from center of mass for both bodies
-            raoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits)) # N_epochs x N_bodies x N_orbits
-            deoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
-            raoff[:, 1, 0] = ra_kepler[:, 1, 0] * (m0 / mtot)
-            deoff[:, 1, 0] = dec_kepler[:, 1, 0] * (m0 / mtot)
-            raoff[:, 0, 0] = -ra_kepler[:, 1, 0] * (mtot - m0) / mtot
-            deoff[:, 0, 0] = -dec_kepler[:, 1, 0] * (mtot - m0) / mtot
-            if not const_plx:
-                # Need to change plx from scalar to array with same length as epochs
-                # Treat given parallax as the parallax on the first observation date
-                plx_dot = 0.013
-                delta_ts_days = epochs - epochs[0]
-                delta_ts_yrs = delta_ts_days / 365.24
-                delta_plxs = delta_ts_yrs * plx_dot
-                plx = plx + delta_plxs
-            d = np.zeros(raoff.shape)
-            z = kepler.calc_orbit(
-                    epochs, sma, ecc, inc, argp, lan, tau, plx, mtot,
-                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch, const_plx=True,
-                    return_z=True)
-            d[:, 1, 0] = (z[1, :] * 4.848102 * 10**-6)
-            d[:, 0, 0] = (z[0, :] * 4.848102 * 10**-6)
-            raoff *= (1 / (3.6 * 10**6)) * (np.pi / 180) * (1000 / plx)
-            deoff *= (1 / (3.6 * 10**6)) * (np.pi / 180) * (1000 / plx)
-            return raoff, deoff, d
 
         if self.fitting_basis == 'XYZ':
             # Find and filter out unbound orbits
@@ -791,7 +721,7 @@ class System(object):
             return raoff, deoff, vz
 
     def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=False,
-                      const_plx=True, model_AB_sep=False, corrections=True):
+                      model_AB_sep=False, full_orbit_model=True):
         """
         Compute model predictions for an array of fitting parameters.
         Calls the above compute_all_orbits() function, adds jitter/gamma to
@@ -820,10 +750,10 @@ class System(object):
 
         if use_rebound:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, comp_rebound=True,
-                                                        use_msinmid_basis=use_msinmid_basis, const_plx=const_plx)
+                                                        use_msinmid_basis=use_msinmid_basis)
         else:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, use_msinmid_basis=use_msinmid_basis,
-                                                        const_plx=const_plx, corrections=corrections)
+                                                        full_orbit_model=full_orbit_model)
 
         if len(standard_params_arr.shape) == 1:
             n_orbits = 1
@@ -835,7 +765,7 @@ class System(object):
         jitter = np.zeros((n_epochs, 2, n_orbits))
         gamma = np.zeros((n_epochs, 2, n_orbits))
 
-        if corrections:
+        if full_orbit_model:
             for body_num in np.arange(self.num_secondary_bodies + 1):
                 model[self.radec[body_num], 0] = raoff[self.radec[body_num], body_num, :]  # N_epochs x N_bodies x N_orbits
                 model[self.radec[body_num], 1] = decoff[self.radec[body_num], body_num, :]

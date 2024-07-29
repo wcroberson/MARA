@@ -48,7 +48,7 @@ def tau_to_manom(date, sma, mtot, tau, tau_ref_epoch):
 
 def calc_orbit(
   epochs, sma, ecc, inc, aop, pan, tau, plx, mtot, mass_for_Kamp=None, tau_ref_epoch=58849, tolerance=1e-9, 
-  max_iter=100, use_c=True, use_gpu=False, const_plx=True, return_z=False, return_cartesian=False
+  max_iter=100, use_c=True, use_gpu=False, return_cartesian=False
 ):
 
     """
@@ -128,46 +128,26 @@ def calc_orbit(
     s1 = np.sin(arg1)
     s2 = np.sin(arg2)
 
-    if return_z:
-        z = np.zeros([2, n_dates])
-        z[0, :] = -1*(np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * radius * (mtot-mass_for_Kamp) / mtot
-
-        z[1, :] = 1*(np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * radius * mass_for_Kamp / mtot
-
-        return z
-    # Added to give the option to make parallax a (linear) function of time
-    if not const_plx:
-        # Need to change plx from scalar to array with same length as epochs
-        # Treat given parallax as the parallax on the first observation date
-        plx_dot = 0.013
-        delta_ts_days = epochs - epochs[0]
-        delta_ts_yrs = delta_ts_days / 365.24
-        delta_plxs = delta_ts_yrs * plx_dot
-        plx = plx + delta_plxs
     # updated sign convention for Green Eq. 19.4-19.7
     raoff = radius * (c2i2*s1 - s2i2*s2) * plx
     deoff = radius * (c2i2*c1 + s2i2*c2) * plx
 
     if return_cartesian:
         zoff = np.zeros(raoff.shape)
-        #zoff[0, :] = -1 * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) \
-        #          * radius * (mtot - mass_for_Kamp) / mtot
-
-        #zoff[1, :] = 1 * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) \
-        #          * radius * mass_for_Kamp / mtot
-        #zoff *= 4.848102 * 10**-6
         zoff = deepcopy(radius) * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * (1 / (3.6 * 10 ** 3)) * (np.pi / 180)
-        #tmp_ra = deepcopy(raoff)
-        tmp_dec = deepcopy(deoff)
-        #raoff = np.zeros([2, n_dates])
-        #deoff = np.zeros([2, n_dates])
-        #raoff[1, :] = tmp_ra * (mass_for_Kamp / mtot)
-        #deoff[1, :] = tmp_dec * (mass_for_Kamp / mtot)
-        #raoff[0, :] = -tmp_ra * (mtot - mass_for_Kamp) / mtot
-        #deoff[0, :] = -tmp_dec * (mtot - mass_for_Kamp) / mtot
         raoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
         deoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
-        return raoff, deoff, zoff
+        # THESE EXPRESSIONS ARE CURRENTLY NOT QUITE RIGHT, I THINK THERE ARE SOME FACTORS OF G MISSING
+        # WANT TO FIX THEN CHECK ZDOT AGAINST vz TO MAKE SURE THEY'RE THE SAME
+        mu = (mtot - mass_for_Kamp) * mass_for_Kamp / mtot
+        h = np.sqrt(mu * sma * (1 - ecc ** 2))
+        p = sma * (1 - ecc ** 2)
+        radot = (raoff * h * ecc / radius / p * np.sin(tanom) - h / r * (
+                np.sin(pan) * np.sin(tanom + aop) - np.cos(pan) * np.cos(tanom + aop) * np.cos(inc)))
+        dedot = deoff * h * ecc / radius / p * np.sin(tanom) - h / r * (
+                np.cos(pan) * np.sin(tanom + aop) + np.sin(pan) * np.cos(tanom + aop) * np.cos(inc))
+        zdot = zoff * h * ecc / radius / p * np.sin(tanom) + h / r * (np.sin(inc) * np.cos(tanom + aop))
+        return raoff, deoff, zoff, radot, dedot, zdot
 
     # compute the radial velocity (vz) of the body (size: n_orbs x n_dates)
     # first comptue the RV semi-amplitude (size: n_orbs x n_dates)
