@@ -602,6 +602,9 @@ class System(object):
             orbit_xp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
             orbit_yp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
             orbit_zp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+            orbit_xdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+            orbit_ydotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+            orbit_zdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
             ref_epoch = Time(2019.5, format='jyear').mjd
             # For below, the COM values should all be true on ref_epoch
             ra_com_i = params_arr[self.basis.standard_basis_idx['ra_com_ref']]
@@ -620,7 +623,7 @@ class System(object):
             d0 = 1 / np.tan(plx_com_i / 1000 / my206265) / my206265
             ra1, dec1, parallax1, pmra1, pmdec1, rv1 = transform_motion(t0, ra_com_i, dec_com_i,
                                                                         plx_com_i, pmra_com_i, pmdec_com_i,
-                                                                        rv_com_i, 0, 0, 0, ra_com_i,
+                                                                        rv_com_i, 0, 0, 0, 0, 0, 0, ra_com_i,
                                                                         dec_com_i, ref_epoch, 0, 0, 0)
 
             d1 = 1 / np.tan(parallax1 / 1000 / my206265) / my206265
@@ -631,9 +634,9 @@ class System(object):
             # I need to get these values from the com of mass values and orbital parameters
             # Can get orbit_x/y/zp for A+B, combine with masses to get com pos, then find x/y/z dist from
             # subtracting those positions from com positions
-            raoff, decoff, zoff = kepler.calc_orbit(
+            raoff, decoff, zoff, radot, decdot, zdot = kepler.calc_orbit(
                 np.append(t1, ref_epoch), sma, ecc, inc, argp, lan, tau, plx, mtot,
-                mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch, const_plx=True,
+                mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch,
                 return_cartesian=True
             )
 
@@ -641,6 +644,9 @@ class System(object):
                 raoff = np.array([raoff])
                 decoff = np.array([decoff])
                 zoff = np.array([zoff])
+                radot = np.array([radot])
+                decdot = np.array([decdot])
+                zdot = np.array([zdot])
 
             orbit_xp[:, 0, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
             orbit_yp[:, 0, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
@@ -648,6 +654,13 @@ class System(object):
             orbit_xp[:, 1, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
             orbit_yp[:, 1, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
             orbit_zp[:, 1, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+
+            orbit_xdotp[:, 0, :] = np.reshape(radot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+            orbit_ydotp[:, 0, :] = np.reshape(decdot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+            orbit_zdotp[:, 0, :] = np.reshape(zdot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+            orbit_xdotp[:, 1, :] = np.reshape(radot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+            orbit_ydotp[:, 1, :] = np.reshape(decdot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+            orbit_zdotp[:, 1, :] = np.reshape(zdot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
 
             orbit_x_ref, orbit_y_ref, orbit_z_ref = rotate(ra_com_i, dec_com_i, orbit_xp[-1, 0, 0],
                                                            orbit_yp[-1, 0, 0], orbit_zp[-1, 0, 0])
@@ -657,6 +670,9 @@ class System(object):
             raA2, decA2, parallaxA2, pmraA2, pmdecA2, rvA2 = transform_motion(t1, ra_A_i, dec_A_i,
                                                                               plx_A_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
+                                                                              orbit_xdotp[:-1, 0, 0],
+                                                                              orbit_ydotp[:-1, 0, 0],
+                                                                              orbit_zdotp[:-1, 0, 0],
                                                                               orbit_xp[:-1, 0, 0], orbit_yp[:-1, 0, 0],
                                                                               orbit_zp[:-1, 0, 0], ra_com_i,
                                                                               dec_com_i, ref_epoch,
@@ -669,6 +685,8 @@ class System(object):
             raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3 = transform_motion(tA2, ra_A_i, dec_A_i,
                                                                               plx_A_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
+                                                                              orbit_xdotp[:-1, 0, 0], orbit_ydotp[:-1, 0, 0],
+                                                                              orbit_zdotp[:-1, 0, 0],
                                                                               orbit_xp[:-1, 0, 0], orbit_yp[:-1, 0, 0],
                                                                               orbit_zp[:-1, 0, 0], ra_com_i,
                                                                               dec_com_i, ref_epoch,
@@ -685,6 +703,8 @@ class System(object):
             raB2, decB2, parallaxB2, pmraB2, pmdecB2, rvB2 = transform_motion(t1, ra_B_i, dec_B_i,
                                                                               plx_B_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
+                                                                              orbit_xdotp[:-1, 1, 0], orbit_ydotp[:-1, 1, 0],
+                                                                              orbit_zdotp[:-1, 1, 0],
                                                                               orbit_xp[:-1, 1, 0], orbit_yp[:-1, 1, 0],
                                                                               orbit_zp[:-1, 1, 0], ra_com_i,
                                                                               dec_com_i, ref_epoch,
@@ -696,6 +716,8 @@ class System(object):
             raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3 = transform_motion(tB2, ra_B_i, dec_B_i,
                                                                               plx_B_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
+                                                                              orbit_xdotp[:-1, 1, 0], orbit_ydotp[:-1, 1, 0],
+                                                                              orbit_zdotp[:-1, 1, 0],
                                                                               orbit_xp[:-1, 1, 0], orbit_yp[:-1, 1, 0],
                                                                               orbit_zp[:-1, 1, 0], ra_com_i,
                                                                               dec_com_i, ref_epoch,
@@ -703,14 +725,12 @@ class System(object):
                                                                               orbit_yp[-1, 1, 0],
                                                                               orbit_zp[-1, 1, 0])
 
-
-
-            return raA2, decA2, parallaxA2, raB2, decB2, parallaxB2
+            return raA3, decA3, parallaxA3, raB3, decB3, parallaxB3
 
         if self.fitting_basis == 'XYZ':
             # Find and filter out unbound orbits
             bad_orbits = np.where(np.logical_or(ecc >= 1., ecc < 0.))[0]
-            if (bad_orbits.size != 0):
+            if bad_orbits.size != 0:
                 raoff[:, :, bad_orbits] = np.inf
                 deoff[:, :, bad_orbits] = np.inf
                 vz[:, :, bad_orbits] = np.inf
@@ -1102,7 +1122,8 @@ def rotate(ra, dec, xp, yp, zp):
 
 
 def transform_motion(epochs, ra_i, dec_i, parallax_i, sys_pmra, sys_pmdec, sys_rv,
-                     orbit_xp, orbit_yp, orbit_zp, ra_com_i, dec_com_i, ref_epoch,
+                     orbit_xp, orbit_yp, orbit_zp, orbit_xdotp, orbit_ydotp, orbit_zdotp,
+                     ra_com_i, dec_com_i, ref_epoch,
                      orbit_xp_ref, orbit_yp_ref, orbit_zp_ref):
     """
     Transforms stellar motion, taking into account changing distance and perspective. Rigorous
@@ -1135,17 +1156,17 @@ def transform_motion(epochs, ra_i, dec_i, parallax_i, sys_pmra, sys_pmdec, sys_r
     """
     del_epochs = ((epochs - ref_epoch) * u.day).to(u.yr).value
     x_i, y_i, z_i, dx_sys, dy_sys, dz_sys = radecz2xyz(ra_i, dec_i, parallax_i, sys_pmra, sys_pmdec, sys_rv)
-    orbit_x, orbit_y, orbit_z = rotate(ra_com_i, dec_com_i, orbit_xp, orbit_yp,
-                                       orbit_zp)
+    orbit_x, orbit_y, orbit_z = rotate(ra_com_i, dec_com_i, orbit_xp, orbit_yp, orbit_zp)
+    orbit_xdot, orbit_ydot, orbit_zdot = rotate(ra_com_i, dec_com_i, orbit_xdotp, orbit_ydotp, orbit_zdotp)
     orbit_x_ref, orbit_y_ref, orbit_z_ref = rotate(ra_com_i, dec_com_i, orbit_xp_ref, orbit_yp_ref,
                                                    orbit_zp_ref)
     x_f = x_i + (dx_sys * del_epochs) + (orbit_x - orbit_x_ref)
     y_f = y_i + (dy_sys * del_epochs) + (orbit_y - orbit_y_ref)
     z_f = z_i + (dz_sys * del_epochs) + (orbit_z - orbit_z_ref)
 
-    dx_f = dx_sys
-    dy_f = dy_sys
-    dz_f = dz_sys
+    dx_f = dx_sys + orbit_xdot
+    dy_f = dy_sys + orbit_ydot
+    dz_f = dz_sys + orbit_zdot
 
     ra_f, dec_f, parallax_f, pmra_f, pmdec_f, rv_f = xyz2radecz(x_f, y_f, z_f, dx_f, dy_f, dz_f)
 

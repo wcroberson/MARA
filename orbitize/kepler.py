@@ -139,14 +139,14 @@ def calc_orbit(
         deoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
         # THESE EXPRESSIONS ARE CURRENTLY NOT QUITE RIGHT, I THINK THERE ARE SOME FACTORS OF G MISSING
         # WANT TO FIX THEN CHECK ZDOT AGAINST vz TO MAKE SURE THEY'RE THE SAME
-        mu = (mtot - mass_for_Kamp) * mass_for_Kamp / mtot
-        h = np.sqrt(mu * sma * (1 - ecc ** 2))
-        p = sma * (1 - ecc ** 2)
-        radot = (raoff * h * ecc / radius / p * np.sin(tanom) - h / r * (
-                np.sin(pan) * np.sin(tanom + aop) - np.cos(pan) * np.cos(tanom + aop) * np.cos(inc)))
-        dedot = deoff * h * ecc / radius / p * np.sin(tanom) - h / r * (
-                np.cos(pan) * np.sin(tanom + aop) + np.sin(pan) * np.cos(tanom + aop) * np.cos(inc))
-        zdot = zoff * h * ecc / radius / p * np.sin(tanom) + h / r * (np.sin(inc) * np.cos(tanom + aop))
+        mu = const.G * mtot * u.Msun
+        h = np.sqrt(mu * sma * u.AU * (1 - ecc ** 2))
+        p = sma * u.AU * (1 - ecc ** 2)
+        radot = ((raoff * u.pc * h * ecc / (radius * u.AU) / p * np.sin(tanom) - h / (radius * u.AU) * (
+                np.sin(pan) * np.sin(tanom + aop) - np.cos(pan) * np.cos(tanom + aop) * np.cos(inc)))).to(u.pc/u.yr).value
+        dedot = (deoff * u.pc * h * ecc / (radius * u.AU) / p * np.sin(tanom) - h / (radius * u.AU) * (
+                np.cos(pan) * np.sin(tanom + aop) + np.sin(pan) * np.cos(tanom + aop) * np.cos(inc))).to(u.pc/u.yr).value
+        zdot = (zoff * u.pc * h * ecc / (radius * u.AU) / p * np.sin(tanom) + h / (radius * u.AU) * (np.sin(inc) * np.cos(tanom + aop))).to(u.pc/u.yr).value
         return raoff, deoff, zoff, radot, dedot, zdot
 
     # compute the radial velocity (vz) of the body (size: n_orbs x n_dates)
