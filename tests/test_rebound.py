@@ -118,12 +118,8 @@ def test_8799_rebound_vs_kepler(plotname=None):
 
     assert hr8799_sys.track_planet_perturbs
 
-    rra, rde, _ = hr8799_sys.compute_all_orbits(
-        params_arr, epochs=epochs, comp_rebound=True
-    )
-    kra, kde, _ = hr8799_sys.compute_all_orbits(
-        params_arr, epochs=epochs, comp_rebound=False
-    )
+    rra, rde, _ = hr8799_sys.compute_all_orbits(params_arr, epochs=epochs, comp_rebound=True)
+    kra, kde, _ = hr8799_sys.compute_all_orbits(params_arr, epochs=epochs, comp_rebound=False)
 
     delta_ra = abs(rra - kra[:, :, 0])
     delta_de = abs(rde - kde[:, :, 0])
