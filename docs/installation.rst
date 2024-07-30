@@ -3,6 +3,19 @@
 Installation
 ============
 
+Important Temporary Note
+++++++++++++++++++++++++
+Sarah has been locked out of her pypi.org account (???) which means that you can't pip install
+the latest version of `orbitize`. If you want to install version 3, you can install the 
+version of the code on github using:
+
+.. code-block:: bash
+
+	$ pip install git+https://github.com/sblunt/orbitize.git
+
+If you're reading this, please upvote Sarah's request to reinstate her pypi.org account: https://github.com/pypi/support/issues/3898
+
+
 For Users
 +++++++++
 
@@ -95,8 +108,10 @@ Issues?
 If you run into any issues installing ``orbitize``, please create an issue on GitHub.
 
 If you are specifically having difficulties using ``cython`` to install ``orbitize``, we
-suggest first trying to install all of the ``orbitize`` dependencies (listed in 
-``requirements.txt``), then disabling compilation of the C-based Kepler module with 
+suggest first trying to install ``wheel``, then installing all of the ``orbitize`` dependencies (listed in 
+``requirements.txt``).
+
+If that doesn't work, we suggest disabling compilation of the C-based Kepler module with 
 the following alternative installation command:
 
 .. code-block:: bash
