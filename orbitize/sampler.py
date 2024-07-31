@@ -125,17 +125,6 @@ class Sampler(abc.ABC):
                 self.system.param_idx,
             )
 
-<<<<<<< HEAD
-            if self.system.gaia is not None:
-
-                gaiahip_epochs = Time(
-                    [self.system.gaia.hipparcos_epoch, self.system.gaia.gaia_epoch], 
-                    format='decimalyear'
-                ).mjd
-
-                # compute Ra/Dec predictions at the Gaia epoch
-                raoff_model, deoff_model, _ = self.system.compute_all_orbits(params, epochs=gaiahip_epochs)
-=======
         if self.system.gaia is not None:
             gaiahip_epochs = Time(
                 np.append(
@@ -143,7 +132,6 @@ class Sampler(abc.ABC):
                 ),
                 format="decimalyear",
             ).mjd
->>>>>>> upstream/main
 
             # compute Ra/Dec predictions at the Gaia epoch
             raoff_model, deoff_model, _ = self.system.compute_all_orbits(
@@ -369,22 +357,8 @@ class OFTI(
 
             # compute sep/PA of generated orbits
             ra, dec, _ = orbitize.kepler.calc_orbit(
-<<<<<<< HEAD
-                self.epochs[min_epoch], sma, ecc, inc, argp, lan, tau, plx, mtot, 
+                self.epochs[min_epoch], sma, ecc, inc, argp, lan, tau, plx, mtot,
                  tau_ref_epoch=0, mass_for_Kamp=m1
-=======
-                self.epochs[min_epoch],
-                sma,
-                ecc,
-                inc,
-                argp,
-                lan,
-                tau,
-                plx,
-                mtot,
-                tau_ref_epoch=0,
-                mass_for_Kamp=m1,
->>>>>>> upstream/main
             )
             sep, pa = orbitize.system.radec2seppa(ra, dec)  # sep[mas], PA[deg]
 
