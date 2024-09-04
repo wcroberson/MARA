@@ -334,7 +334,7 @@ class System(object):
         hf.attrs['use_rebound'] = self.use_rebound
 
     def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=False,
-                           full_orbit_model=False):
+                           full_orbit_model=False, ref_epoch_jyear=2019.5):
         """
         Calls orbitize.kepler.calc_orbit and optionally accounts for multi-body
         interactions. Also computes total quantities like RV (without jitter/gamma)
@@ -506,7 +506,7 @@ class System(object):
                 # solve Kepler's equation
                 raoff, decoff, vz_i = kepler.calc_orbit(
                     epochs, sma, ecc, inc, argp, lan, tau, plx, mtot,
-                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch, const_plx=const_plx
+                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch
                 )
 
                 # raoff, decoff, vz are scalers if the length of epochs is 1
@@ -593,6 +593,10 @@ class System(object):
                 # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
                 mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                 m0 = params_arr[self.basis.standard_basis_idx['m0']]
+                if self.num_secondary_bodies > 1:
+                    for i in range(2, self.num_secondary_bodies + 1):
+                        m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
+                        m0 += m
 
                 if body_num == 1:
                     tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
@@ -652,7 +656,7 @@ class System(object):
             orbit_xdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
             orbit_ydotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
             orbit_zdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
-            ref_epoch = Time(2019.5, format='jyear').mjd
+            ref_epoch = Time(ref_epoch_jyear, format='jyear').mjd  # Time(2019.5, format='jyear').mjd
             # For below, the COM values should all be true on ref_epoch
             ra_com_i = params_arr[self.basis.standard_basis_idx['ra_com_ref']]
             dec_com_i = params_arr[self.basis.standard_basis_idx['dec_com_ref']]
@@ -759,7 +763,7 @@ class System(object):
                                                                               orbit_yp[-1, 1, 0],
                                                                               orbit_zp[-1, 1, 0])
             dB2 = 1 / np.tan(parallaxB2 / 1000 / my206265) / my206265
-            tB2 = light_timing_correction_iteration(t1, d1, dA2)
+            tB2 = light_timing_correction_iteration(t1, d1, dB2)
             raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3 = transform_motion(tB2, ra_B_i, dec_B_i,
                                                                               plx_B_i, pmra_com_i, pmdec_com_i,
                                                                               rv_com_i,
@@ -771,8 +775,111 @@ class System(object):
                                                                               orbit_xp[-1, 1, 0],
                                                                               orbit_yp[-1, 1, 0],
                                                                               orbit_zp[-1, 1, 0])
+            # If indicated by orbital parameters, add perturbations due to a planet around the primary star
+            if self.num_secondary_bodies > 1:
+                body_num = 2
+                sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
+                ecc = params_arr[self.basis.standard_basis_idx['ecc{}'.format(body_num)]]
+                inc = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
+                argp = params_arr[self.basis.standard_basis_idx['aop{}'.format(body_num)]]
+                lan = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
+                tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
+                plx = params_arr[self.basis.standard_basis_idx['plx']]
+                if self.fit_secondary_mass:
+                    # This if statement has been changed with a workaround so
+                    # we can fit the secondary with period instead of mass
 
-            return raA3, decA3, parallaxA3, raB3, decB3, parallaxB3
+                    # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
+                    mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
+                    m0 = params_arr[self.basis.standard_basis_idx['m0']]
+
+                    if body_num == 1:
+                        tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
+                        mass = ((sma ** 3) / (mass ** 2)) - m0
+                    else:
+                        if use_msinmid_basis:
+                            # Changing basis to fit in period and Msin(mi_d) for the planets
+                            # The following line actually calculates time of conjunction, because it is given tau_conj
+                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
+                            epp = timetrans_to_timeperi(t_conj, sma, ecc, argp)
+                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
+
+                            mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc) +
+                                             np.sin(np.pi / 2) * np.sin(inc) * np.cos((107.7 * np.pi / 180) - lan))  # 120 degrees is only roughly right, should do it more rigorously
+
+                            mass /= np.sin(mi_d)
+
+                            sma = (sma ** 2 * (mass + m0)) ** (1 / 3)
+                        else:
+                            period = np.sqrt(sma ** 3 / (mass + m0))
+                            # The following line actually calculates time of conjunction, because it is given tau_conj
+                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
+                            epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
+                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
+
+                    all_smas = params_arr[self.sma_indx]
+                    all_smas[0] *= 1000 / plx
+                    within_orbit = np.where(all_smas <= sma)
+                    outside_orbit = np.where(all_smas > sma)
+                    all_pl_masses = params_arr[self.secondary_mass_indx]
+                    all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
+                    inside_masses = all_pl_masses[within_orbit]
+                    mtot = np.sum(inside_masses) + m0
+                else:
+                    m_pl = np.zeros(self.num_secondary_bodies)
+                    # if not fitting for secondary mass, then total mass must be stellar mass
+                    mass = None
+                    m0 = None
+                    mtot = params_arr[self.basis.standard_basis_idx['mtot']]
+                planet_orbit_xp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+                planet_orbit_yp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+                planet_orbit_zp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+                planet_orbit_xdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+                planet_orbit_ydotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+                planet_orbit_zdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+                planet_raoff, planet_decoff, planet_zoff, planet_radot, planet_decdot, planet_zdot = kepler.calc_orbit(
+                    np.append(tA2, ref_epoch), sma, ecc, inc, argp, lan, tau, plx, mtot,
+                    mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch,
+                    return_cartesian=True
+                )
+
+                if len(epochs) == 1:
+                    planet_raoff = np.array([planet_raoff])
+                    planet_decoff = np.array([planet_decoff])
+                    planet_zoff = np.array([planet_zoff])
+                    planet_radot = np.array([planet_radot])
+                    planet_decdot = np.array([planet_decdot])
+                    planet_zdot = np.array([planet_zdot])
+
+                planet_orbit_xp[:, 0, :] = np.reshape(planet_raoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+                planet_orbit_yp[:, 0, :] = np.reshape(planet_decoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+                planet_orbit_zp[:, 0, :] = np.reshape(planet_zoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+                planet_orbit_xp[:, 1, :] = np.reshape(planet_raoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+                planet_orbit_yp[:, 1, :] = np.reshape(planet_decoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+                planet_orbit_zp[:, 1, :] = np.reshape(planet_zoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+
+                planet_orbit_xdotp[:, 0, :] = np.reshape(planet_radot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+                planet_orbit_ydotp[:, 0, :] = np.reshape(planet_decdot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+                planet_orbit_zdotp[:, 0, :] = np.reshape(planet_zdot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
+                planet_orbit_xdotp[:, 1, :] = np.reshape(planet_radot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+                planet_orbit_ydotp[:, 1, :] = np.reshape(planet_decdot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+                planet_orbit_zdotp[:, 1, :] = np.reshape(planet_zdot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+
+                raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3 = transform_motion(tA2, ra_A_i, dec_A_i,
+                                                                                  plx_A_i, pmra_com_i, pmdec_com_i,
+                                                                                  rv_com_i,
+                                                                                  orbit_xdotp[:-1, 0, 0]+planet_orbit_xdotp[:-1, 0, 0],
+                                                                                  orbit_ydotp[:-1, 0, 0]+planet_orbit_ydotp[:-1, 0, 0],
+                                                                                  orbit_zdotp[:-1, 0, 0]+planet_orbit_zdotp[:-1, 0, 0],
+                                                                                  orbit_xp[:-1, 0, 0]+planet_orbit_xp[:-1, 0, 0],
+                                                                                  orbit_yp[:-1, 0, 0]+planet_orbit_yp[:-1, 0, 0],
+                                                                                  orbit_zp[:-1, 0, 0]+planet_orbit_zp[:-1, 0, 0], ra_com_i,
+                                                                                  dec_com_i, ref_epoch,
+                                                                                  orbit_xp[-1, 0, 0]+planet_orbit_xp[-1, 0, 0],
+                                                                                  orbit_yp[-1, 0, 0]+planet_orbit_yp[-1, 0, 0],
+                                                                                  orbit_zp[-1, 0, 0]+planet_orbit_zp[-1, 0, 0])
+
+            return raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3, raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3
 
         if self.fitting_basis == 'XYZ':
             # Find and filter out unbound orbits
@@ -786,7 +893,6 @@ class System(object):
                 return raoff, deoff, vz
         else:
             return raoff, deoff, vz
-
 
     def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=False,
                       model_AB_sep=False, full_orbit_model=True):
@@ -834,114 +940,132 @@ class System(object):
         gamma = np.zeros((n_epochs, 2, n_orbits))
 
         if full_orbit_model:
-            for body_num in np.arange(self.num_secondary_bodies + 1):
-                model[self.radec[body_num], 0] = raoff[self.radec[body_num], body_num, :]  # N_epochs x N_bodies x N_orbits
-                model[self.radec[body_num], 1] = decoff[self.radec[body_num], body_num, :]
-            if n_orbits == 1:
-                model = model.reshape((n_epochs, 2))
-                jitter = jitter.reshape((n_epochs, 2))
-                gamma = gamma.reshape((n_epochs, 2))
-
-            return model, jitter
-
-        if len(self.rv[0]) > 0 and self.fit_secondary_mass:
-            # looping through instruments to get the gammas & jitters
-            for rv_idx in range(len(self.rv_instruments)):
-                jitter[self.rv_inst_indices[rv_idx], 0] = standard_params_arr[  # [km/s]
-                    self.basis.standard_basis_idx[
-                        "sigma_{}".format(self.rv_instruments[rv_idx])
+            if len(self.rv[0]) > 0 and self.fit_secondary_mass:
+                # looping through instruments to get the gammas & jitters
+                for rv_idx in range(len(self.rv_instruments)):
+                    jitter[self.rv_inst_indices[rv_idx], 0] = standard_params_arr[  # [km/s]
+                        self.basis.standard_basis_idx[
+                            "sigma_{}".format(self.rv_instruments[rv_idx])
+                        ]
                     ]
-                ]
-                jitter[self.rv_inst_indices[rv_idx], 1] = np.nan
+                    jitter[self.rv_inst_indices[rv_idx], 1] = np.nan
 
-                gamma[self.rv_inst_indices[rv_idx], 0] = standard_params_arr[
-                    self.basis.standard_basis_idx['gamma_{}'.format(self.rv_instruments[rv_idx])]
-                ]
-                gamma[self.rv_inst_indices[rv_idx], 1] = np.nan
+                    gamma[self.rv_inst_indices[rv_idx], 0] = standard_params_arr[
+                        self.basis.standard_basis_idx[
+                            "gamma_{}".format(self.rv_instruments[rv_idx])
+                        ]
+                    ]
+                    gamma[self.rv_inst_indices[rv_idx], 1] = np.nan
 
-        '''for body_num in np.arange(self.num_secondary_bodies + 1):
-            # for the model points that correspond to this planet's orbit, add the model prediction
-            # RA/Dec
-            if len(self.radec[body_num]) > 0:  # (prevent empty array dimension errors)
-                model[self.radec[body_num], 0] = raoff[
-                    self.radec[body_num], body_num, :
-                ]  # N_epochs x N_bodies x N_orbits
-                model[self.radec[body_num], 1] = decoff[
-                    self.radec[body_num], body_num, :
-                ]
+            # I'm assuming that any measurements will be measurements of the primary or secondary star, not any
+            # of the planets. Thus, the only bodies we look through will be bodies 0 and 1. I will also assumed
+            # that radec measurements represent absolute astrometry of either A or B. This astrometry should be in
+            # degrees, and should be in the ICRS J2000 coordinate system. Any seppa measurements should correspond
+            # to the position of the secondary star relative to the primary (this will be the label used for
+            # SHERA separations). RV measurements can be used for either star, i.e. RVs of both stars could be given
+            # separately.
+            for body_num in np.arange(self.num_secondary_bodies + 1):
+                # for the model points that correspond to this planet's orbit, add the model prediction
+                # RA/Dec
+                if len(self.radec[body_num]) > 0:  # (prevent empty array dimension errors)
+                    model[self.radec[body_num], 0] = raoff[
+                                                     self.radec[body_num], body_num, :
+                                                     ]  # N_epochs x N_bodies x N_orbits
+                    model[self.radec[body_num], 1] = decoff[
+                                                     self.radec[body_num], body_num, :
+                                                     ]
 
-            # Sep/PA
-            # Commented out if statement since we need pas for star - 8/3/23
-            # if len(self.seppa[body_num]) > 0:
-            sep, pa = radec2seppa(raoff, decoff)
+                # Sep/PA
+                if len(self.seppa[body_num]) > 0:
+                    sep, pa = radec2seppa(raoff, decoff)
 
-            model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
-            model[self.seppa[body_num], 1] = pa[self.seppa[body_num], body_num, :]
+                    model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
+                    model[self.seppa[body_num], 1] = pa[self.seppa[body_num], body_num, :]
 
-            # RV
-            if len(self.rv[body_num]) > 0:
-                model[self.rv[body_num], 0] = vz[self.rv[body_num], body_num, :]
-                model[self.rv[body_num], 1] = np.nan'''
+                # RV
+                if len(self.rv[body_num]) > 0:
+                    model[self.rv[body_num], 0] = vz[self.rv[body_num], body_num, :]
+                    model[self.rv[body_num], 1] = np.nan
 
-        sep, pa = radec2seppa(raoff, decoff) # comment out loop above due to this line
-        m_primary = params_arr[-1]
-        total_mass = 0
-        for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:
-            inc_planet = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
-            pan_planet = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
-            mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc_planet) +
-                             np.sin(np.pi / 2) * np.sin(inc_planet) * np.cos((107.7 * np.pi / 180) - pan_planet))
-            if use_msinmid_basis:
-                m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
-            else:
-                m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
+                # if we have abs astrometry measurements in the input file (i.e. not
+                # from Hipparcos or Gaia), add the parallactic & proper motion here by
+                # calling AbsAstrom compute_model
+            if len(self.radec[0]) > 0:
+                ra_pred, dec_pred = self.pm_plx_predictor.compute_astrometric_model(
+                    params_arr, self.param_idx
+                )
 
-            total_mass += m_planet
+                # divide by cos(delta0) because orbitize! input is delta(ra), not
+                # delta(ra)*cos(delta0)
+                model[self.radec[0], 0] += ra_pred.reshape(model[self.radec[0], 0].shape) / np.cos(
+                    np.radians(self.pm_plx_predictor.delta0))
+                model[self.radec[0], 1] += dec_pred.reshape(model[self.radec[0], 0].shape)
 
-            if fix_pa:
-                model[:, 0, :] += sep[:, body_num, :] * m_planet * \
-                                  np.cos(((pa[:, body_num, :] - 107.7) * np.pi / 180))
-            else:
-                model[:, 0, :] += sep[:, body_num, :] * m_planet * \
-                                  np.cos(((pa[:, body_num, :] - pa[:, 1,
-                                                                :]) * np.pi / 180))
-        total_mass += m_primary
-        model[:, 0, :] /= total_mass
-        model[:, 1] = np.nan
+        else:
+            if len(self.rv[0]) > 0 and self.fit_secondary_mass:
+                # looping through instruments to get the gammas & jitters
+                for rv_idx in range(len(self.rv_instruments)):
+                    jitter[self.rv_inst_indices[rv_idx], 0] = standard_params_arr[  # [km/s]
+                        self.basis.standard_basis_idx[
+                            "sigma_{}".format(self.rv_instruments[rv_idx])
+                        ]
+                    ]
+                    jitter[self.rv_inst_indices[rv_idx], 1] = np.nan
 
-        if model_AB_sep:
-            model[:, 0, :] += sep[:, 1, :]
+                    gamma[self.rv_inst_indices[rv_idx], 0] = standard_params_arr[
+                        self.basis.standard_basis_idx['gamma_{}'.format(self.rv_instruments[rv_idx])]
+                    ]
+                    gamma[self.rv_inst_indices[rv_idx], 1] = np.nan
 
-        # Below sets model (and thus residuals) to inf if the smas are not ordered properly
-        if self.num_secondary_bodies > 2:
-            for body_num in np.arange(self.num_secondary_bodies)[2:]:
-                sma_planet1 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
-                sma_planet2 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num + 1)]]
-                if sma_planet2 < sma_planet1:
-                    model[:, 0, :] = np.inf
+            sep, pa = radec2seppa(raoff, decoff) # comment out loop above due to this line
+            m_primary = params_arr[-1]
+            total_mass = 0
+            for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:
+                inc_planet = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
+                pan_planet = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
+                mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc_planet) +
+                                 np.sin(np.pi / 2) * np.sin(inc_planet) * np.cos((107.7 * np.pi / 180) - pan_planet))
+                if use_msinmid_basis:
+                    m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
+                else:
+                    m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
 
+                total_mass += m_planet
 
-        # Below changes data products to be either delta sep for the two stars or np.nan
-        '''m1 = params_arr[-1]
-        m2 = params_arr[-2]
+                if fix_pa:
+                    model[:, 0, :] += sep[:, body_num, :] * m_planet * \
+                                      np.cos(((pa[:, body_num, :] - 107.7) * np.pi / 180))
+                else:
+                    model[:, 0, :] += sep[:, body_num, :] * m_planet * \
+                                      np.cos(((pa[:, body_num, :] - pa[:, 1,
+                                                                    :]) * np.pi / 180))
+            total_mass += m_primary
+            model[:, 0, :] /= total_mass
+            model[:, 1] = np.nan
 
-        model[:, 0, :] = sep[:, 2, :] * m2 * np.cos(((pa[:, 2, :] - pa[:, 1, :]) * np.pi / 180)) / (m1 + m2)
-        model[self.seppa[2], 0] = np.nan
-        model[self.seppa[1], 1] = np.nan
-        model[self.seppa[2], 1] = np.nan'''
+            if model_AB_sep:
+                model[:, 0, :] += sep[:, 1, :]
 
-        # if we have abs astrometry measurements in the input file (i.e. not
-        # from Hipparcos or Gaia), add the parallactic & proper motion here by
-        # calling AbsAstrom compute_model
-        if len(self.radec[0]) > 0:
-            ra_pred, dec_pred = self.pm_plx_predictor.compute_astrometric_model(
-                params_arr, self.param_idx
-            )
+            # Below sets model (and thus residuals) to inf if the smas are not ordered properly
+            if self.num_secondary_bodies > 2:
+                for body_num in np.arange(self.num_secondary_bodies)[2:]:
+                    sma_planet1 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
+                    sma_planet2 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num + 1)]]
+                    if sma_planet2 < sma_planet1:
+                        model[:, 0, :] = np.inf
 
-            # divide by cos(delta0) because orbitize! input is delta(ra), not
-            # delta(ra)*cos(delta0)
-            model[self.radec[0], 0] += ra_pred.reshape(model[self.radec[0], 0].shape) / np.cos(np.radians(self.pm_plx_predictor.delta0))
-            model[self.radec[0], 1] += dec_pred.reshape(model[self.radec[0], 0].shape)
+            # if we have abs astrometry measurements in the input file (i.e. not
+            # from Hipparcos or Gaia), add the parallactic & proper motion here by
+            # calling AbsAstrom compute_model
+            if len(self.radec[0]) > 0:
+                ra_pred, dec_pred = self.pm_plx_predictor.compute_astrometric_model(
+                    params_arr, self.param_idx
+                )
+
+                # divide by cos(delta0) because orbitize! input is delta(ra), not
+                # delta(ra)*cos(delta0)
+                model[self.radec[0], 0] += ra_pred.reshape(model[self.radec[0], 0].shape) / np.cos(np.radians(self.pm_plx_predictor.delta0))
+                model[self.radec[0], 1] += dec_pred.reshape(model[self.radec[0], 0].shape)
 
         if n_orbits == 1:
             model = model.reshape((n_epochs, 2))
@@ -1195,7 +1319,7 @@ def rotate(ra, dec, xp, yp, zp):
 
 
 def transform_motion(epochs, ra_i, dec_i, parallax_i, sys_pmra, sys_pmdec, sys_rv,
-                     orbit_xp, orbit_yp, orbit_zp, orbit_xdotp, orbit_ydotp, orbit_zdotp,
+                     orbit_xdotp, orbit_ydotp, orbit_zdotp, orbit_xp, orbit_yp, orbit_zp,
                      ra_com_i, dec_com_i, ref_epoch,
                      orbit_xp_ref, orbit_yp_ref, orbit_zp_ref):
     """

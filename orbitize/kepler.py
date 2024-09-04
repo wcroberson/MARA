@@ -3,6 +3,7 @@ This module solves for the orbit of the planet given Keplerian parameters.
 """
 import numpy as np
 import astropy.units as u
+import astropy.constants as const
 import astropy.constants as consts
 from copy import deepcopy
 
@@ -137,16 +138,18 @@ def calc_orbit(
         zoff = deepcopy(radius) * (np.cos(aop) * np.sin(inc) * np.sin(tanom) + np.cos(tanom) * np.sin(inc) * np.sin(aop)) * (1 / (3.6 * 10 ** 3)) * (np.pi / 180)
         raoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
         deoff *= (1 / (3.6 * 10 ** 3)) * (np.pi / 180) * (1 / plx)
-        # THESE EXPRESSIONS ARE CURRENTLY NOT QUITE RIGHT, I THINK THERE ARE SOME FACTORS OF G MISSING
-        # WANT TO FIX THEN CHECK ZDOT AGAINST vz TO MAKE SURE THEY'RE THE SAME
-        mu = const.G * mtot * u.Msun
-        h = np.sqrt(mu * sma * u.AU * (1 - ecc ** 2))
-        p = sma * u.AU * (1 - ecc ** 2)
-        radot = ((raoff * u.pc * h * ecc / (radius * u.AU) / p * np.sin(tanom) - h / (radius * u.AU) * (
-                np.sin(pan) * np.sin(tanom + aop) - np.cos(pan) * np.cos(tanom + aop) * np.cos(inc)))).to(u.pc/u.yr).value
-        dedot = (deoff * u.pc * h * ecc / (radius * u.AU) / p * np.sin(tanom) - h / (radius * u.AU) * (
-                np.cos(pan) * np.sin(tanom + aop) + np.sin(pan) * np.cos(tanom + aop) * np.cos(inc))).to(u.pc/u.yr).value
-        zdot = (zoff * u.pc * h * ecc / (radius * u.AU) / p * np.sin(tanom) + h / (radius * u.AU) * (np.sin(inc) * np.cos(tanom + aop))).to(u.pc/u.yr).value
+        radot = np.zeros(raoff.shape)
+        dedot = np.zeros(raoff.shape)
+        zdot = np.zeros(raoff.shape)
+
+        for i in range(len(epochs)):
+            xyz_res = kepler_to_xyz(np.array([sma]), np.array([ecc]), np.array([inc]),
+                                    np.array([aop]), np.array([pan]), np.array([tau]), np.array([mtot]),
+                                    np.array([plx]), epochs[i], eanom[i])
+            radot[i] = (xyz_res[3]*u.km/u.s).to(u.pc/u.yr).value
+            dedot[i] = (xyz_res[4] * u.km / u.s).to(u.pc / u.yr).value
+            zdot[i] = (xyz_res[5] * u.km / u.s).to(u.pc / u.yr).value
+
         return raoff, deoff, zoff, radot, dedot, zdot
 
     # compute the radial velocity (vz) of the body (size: n_orbs x n_dates)
@@ -419,3 +422,65 @@ def _CUDA_mikkola_solver(manom, ecc):
     kep_gpu_ctx.mikkola(manom, ecc, eanom)
 
     return eanom
+
+
+def kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs,
+                  eanom):
+    if ecc == 0:
+        ecc = 1e-8
+    if inc == 0:
+        inc = 1e-8
+    period = np.sqrt(4 * np.pi ** 2.0 * (sma * u.AU) ** 3 / (consts.G * (mtot * u.Msun)))
+    period = period.to(u.day).value  # Period in days
+    mean_motion = 2 * np.pi / period
+
+    # Magnitude of angular momentum:
+    h = np.sqrt(consts.G * (mtot * u.Msun) * (sma * u.AU) * (1 - ecc ** 2))
+
+    # Position vector in the perifocal system in AU
+    pos_peri_x = (sma * (np.cos(eanom) - ecc))
+    pos_peri_y = (sma * np.sqrt(1 - ecc ** 2) * np.sin(eanom))
+    pos_peri_z = np.zeros(len(pos_peri_x))
+
+    pos = np.stack((pos_peri_x, pos_peri_y, pos_peri_z)).T
+    pos_magnitude = np.linalg.norm(pos, axis=1)
+
+    # Velocity vector in the perifocal system in km/s
+    vel_peri_x = - ((np.sqrt(consts.G * (mtot * u.Msun) * (sma * u.AU)) * np.sin(eanom) / (pos_magnitude * u.AU)).to(
+        u.km / u.s)).value
+    vel_peri_y = ((h * np.cos(eanom) / (pos_magnitude * u.AU)).to(u.km / u.s)).value
+    vel_peri_z = np.zeros(len(vel_peri_x))
+
+    vel = np.stack((vel_peri_x, vel_peri_y, vel_peri_z)).T
+
+    # Transformation matrix to inertial xyz system, component by component
+    pan = pan + np.pi / 2.0
+    T_11 = np.cos(pan) * np.cos(aop) - np.sin(pan) * np.sin(aop) * np.cos(inc)
+    T_12 = - np.cos(pan) * np.sin(aop) - np.sin(pan) * np.cos(aop) * np.cos(inc)
+    T_13 = np.sin(pan) * np.sin(inc)
+
+    T_21 = np.sin(pan) * np.cos(aop) + np.cos(pan) * np.sin(aop) * np.cos(inc)
+    T_22 = - np.sin(pan) * np.sin(aop) + np.cos(pan) * np.cos(aop) * np.cos(inc)
+    T_23 = - np.cos(pan) * np.sin(inc)
+
+    T_31 = np.sin(aop) * np.sin(inc)
+    T_32 = np.cos(aop) * np.sin(inc)
+    T_33 = np.cos(inc)
+
+    T = np.array([[T_11, T_12, T_13],
+                  [T_21, T_22, T_23],
+                  [T_31, T_32, T_33]])
+
+    pos_xyz = np.zeros((len(sma), 3))
+    vel_xyz = np.zeros((len(sma), 3))
+    for k in range(len(sma)):
+        pos_xyz[k, :] = np.matmul(T[:, :, k], pos[k])
+        vel_xyz[k, :] = np.matmul(T[:, :, k], vel[k])
+
+    result = np.stack(
+        [-pos_xyz[:, 0], pos_xyz[:, 1], pos_xyz[:, 2], -vel_xyz[:, 0], vel_xyz[:, 1], vel_xyz[:, 2], plx, mtot])
+
+    if len(sma) == 1:
+        result = result.T
+
+    return np.squeeze(result)
