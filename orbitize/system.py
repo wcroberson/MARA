@@ -574,6 +574,9 @@ class System(object):
             raoff = ra_kepler  # + ra_perturb
             deoff = dec_kepler  # + dec_perturb
         elif full_orbit_model:
+            if n_orbits != 1:
+                print('Error: The full orbit model can only be used for one set of orbital parameters at once')
+                return
             body_num = 1
             my206265 = 180 / np.pi * 60 * 60
             sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
@@ -584,7 +587,7 @@ class System(object):
             tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
             plx = params_arr[self.basis.standard_basis_idx['plx']]
             if body_num == 1:
-                sma *= 1000 / plx
+                sma *= 1 / np.tan(plx / 1000 / my206265) / my206265
 
             if self.fit_secondary_mass:
                 # This if statement has been changed with a workaround so
@@ -593,14 +596,15 @@ class System(object):
                 # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
                 mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                 m0 = params_arr[self.basis.standard_basis_idx['m0']]
-                if self.num_secondary_bodies > 1:
-                    for i in range(2, self.num_secondary_bodies + 1):
-                        m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
-                        m0 += m
 
                 if body_num == 1:
                     tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
+
                     mass = ((sma**3) / (mass**2)) - m0
+                    if self.num_secondary_bodies > 1:
+                        for i in range(2, self.num_secondary_bodies + 1):
+                            m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
+                            mass -= m
                 else:
                     if use_msinmid_basis:
                         # Changing basis to fit in period and Msin(mi_d) for the planets
@@ -623,11 +627,15 @@ class System(object):
                         tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
 
                 all_smas = params_arr[self.sma_indx]
-                all_smas[0] *= 1000 / plx
+                all_smas[0] *= 1 / np.tan(plx / 1000 / my206265) / my206265
                 within_orbit = np.where(all_smas <= sma)
                 outside_orbit = np.where(all_smas > sma)
                 all_pl_masses = params_arr[self.secondary_mass_indx]
                 all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
+                if self.num_secondary_bodies > 1:
+                    for i in range(2, self.num_secondary_bodies + 1):
+                        m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
+                        all_pl_masses[0] -= m
                 inside_masses = all_pl_masses[within_orbit]
                 mtot = np.sum(inside_masses) + m0
 
@@ -699,19 +707,19 @@ class System(object):
                 decdot = np.array([decdot])
                 zdot = np.array([zdot])
 
-            orbit_xp[:, 0, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
-            orbit_yp[:, 0, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
-            orbit_zp[:, 0, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
-            orbit_xp[:, 1, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
-            orbit_yp[:, 1, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
-            orbit_zp[:, 1, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+            orbit_xp[:, 0, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * -1 * mass / mtot
+            orbit_yp[:, 0, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * -1 * mass / mtot
+            orbit_zp[:, 0, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * -1 * mass / mtot
+            orbit_xp[:, 1, :] = np.reshape(raoff, (n_epochs + 1, n_orbits)) * (mtot - mass) / mtot
+            orbit_yp[:, 1, :] = np.reshape(decoff, (n_epochs + 1, n_orbits)) * (mtot - mass) / mtot
+            orbit_zp[:, 1, :] = np.reshape(zoff, (n_epochs + 1, n_orbits)) * (mtot - mass) / mtot
 
-            orbit_xdotp[:, 0, :] = np.reshape(radot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
-            orbit_ydotp[:, 0, :] = np.reshape(decdot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
-            orbit_zdotp[:, 0, :] = np.reshape(zdot, (n_epochs + 1, n_orbits)) * -1 * mass / (m0 + mass)
-            orbit_xdotp[:, 1, :] = np.reshape(radot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
-            orbit_ydotp[:, 1, :] = np.reshape(decdot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
-            orbit_zdotp[:, 1, :] = np.reshape(zdot, (n_epochs + 1, n_orbits)) * m0 / (m0 + mass)
+            orbit_xdotp[:, 0, :] = np.reshape(radot, (n_epochs + 1, n_orbits)) * -1 * mass / mtot
+            orbit_ydotp[:, 0, :] = np.reshape(decdot, (n_epochs + 1, n_orbits)) * -1 * mass / mtot
+            orbit_zdotp[:, 0, :] = np.reshape(zdot, (n_epochs + 1, n_orbits)) * -1 * mass / mtot
+            orbit_xdotp[:, 1, :] = np.reshape(radot, (n_epochs + 1, n_orbits)) * (mtot - mass) / mtot
+            orbit_ydotp[:, 1, :] = np.reshape(decdot, (n_epochs + 1, n_orbits)) * (mtot - mass) / mtot
+            orbit_zdotp[:, 1, :] = np.reshape(zdot, (n_epochs + 1, n_orbits)) * (mtot - mass) / mtot
 
             orbit_x_ref, orbit_y_ref, orbit_z_ref = rotate(ra_com_i, dec_com_i, orbit_xp[-1, 0, 0],
                                                            orbit_yp[-1, 0, 0], orbit_zp[-1, 0, 0])
@@ -837,6 +845,7 @@ class System(object):
                 planet_orbit_xdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
                 planet_orbit_ydotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
                 planet_orbit_zdotp = np.zeros((n_epochs + 1, self.num_secondary_bodies + 1, n_orbits))
+
                 planet_raoff, planet_decoff, planet_zoff, planet_radot, planet_decdot, planet_zdot = kepler.calc_orbit(
                     np.append(tA2, ref_epoch), sma, ecc, inc, argp, lan, tau, plx, mtot,
                     mass_for_Kamp=m0, tau_ref_epoch=self.tau_ref_epoch,
@@ -878,7 +887,16 @@ class System(object):
                                                                                   orbit_xp[-1, 0, 0]+planet_orbit_xp[-1, 0, 0],
                                                                                   orbit_yp[-1, 0, 0]+planet_orbit_yp[-1, 0, 0],
                                                                                   orbit_zp[-1, 0, 0]+planet_orbit_zp[-1, 0, 0])
+            raoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
+            decoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
+            vz = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
 
+            raoff[:, 0, 0] = raA3
+            raoff[:, 1, 0] = raB2
+            decoff[:, 0, 0] = decA3
+            decoff[:, 1, 0] = decB2
+            vz[:, 0, 0] = rvA3
+            vz[:, 1, 0] = rvB2
             return raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3, raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3
 
         if self.fitting_basis == 'XYZ':
