@@ -897,7 +897,7 @@ class System(object):
             decoff[:, 1, 0] = decB2
             vz[:, 0, 0] = rvA3
             vz[:, 1, 0] = rvB2
-            return raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3, raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3
+            return raoff, decoff, vz
 
         if self.fitting_basis == 'XYZ':
             # Find and filter out unbound orbits
@@ -995,7 +995,16 @@ class System(object):
 
                 # Sep/PA
                 if len(self.seppa[body_num]) > 0:
-                    sep, pa = radec2seppa(raoff, decoff)
+                    if full_orbit_model:
+                        rel_raoff = np.zeros(raoff.shape)
+                        rel_decoff = np.zeros(raoff.shape)
+                        rel_raoff[:, 0, :] = raoff[:, 1, :] - raoff[:, 0, :]
+                        rel_decoff[:, 0, :] = decoff[:, 1, :] - decoff[:, 0, :]
+                        rel_raoff[:, 1, :] = raoff[:, 0, :] - raoff[:, 1, :]
+                        rel_decoff[:, 1, :] = decoff[:, 0, :] - decoff[:, 1, :]
+                        sep, pa = radec2seppa(rel_raoff, rel_decoff)
+                    else:
+                        sep, pa = radec2seppa(raoff, decoff)
 
                     model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
                     model[self.seppa[body_num], 1] = pa[self.seppa[body_num], body_num, :]
@@ -1005,7 +1014,7 @@ class System(object):
                     model[self.rv[body_num], 0] = vz[self.rv[body_num], body_num, :]
                     model[self.rv[body_num], 1] = np.nan
 
-                # if we have abs astrometry measurements in the input file (i.e. not
+                '''# if we have abs astrometry measurements in the input file (i.e. not
                 # from Hipparcos or Gaia), add the parallactic & proper motion here by
                 # calling AbsAstrom compute_model
             if len(self.radec[0]) > 0:
@@ -1017,7 +1026,7 @@ class System(object):
                 # delta(ra)*cos(delta0)
                 model[self.radec[0], 0] += ra_pred.reshape(model[self.radec[0], 0].shape) / np.cos(
                     np.radians(self.pm_plx_predictor.delta0))
-                model[self.radec[0], 1] += dec_pred.reshape(model[self.radec[0], 0].shape)
+                model[self.radec[0], 1] += dec_pred.reshape(model[self.radec[0], 0].shape)'''
 
         else:
             if len(self.rv[0]) > 0 and self.fit_secondary_mass:
