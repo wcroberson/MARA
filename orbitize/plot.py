@@ -97,9 +97,9 @@ def plot_corner(results, param_list=None, **corner_kwargs):
         'zdot' : '$zdot_{0}$ [km/s]',
         'ra_com_ref' : 'RA$_{{COM,ref}} [deg]$',
         'dec_com_ref' : 'Dec$_{{COM,ref}} [deg]$',
-        'pmra_com_ref' : '$\\alpha^{{*}}_{{COM,ref}}$ [mas/yr]$',
-        'pmdec_com_ref' : '$\\delta^_{{COM,ref}}$ [mas/yr]$',
-        'rv_com_ref' : 'RV$_{{COM, ref}}$ [km/s]$',
+        'pmra_com_ref' : 'PMRA$^{{*}}_{{COM,ref}} [mas/yr]$',
+        'pmdec_com_ref' : 'PMDEC$_{{COM,ref}} [mas/yr]$',
+        'rv_com_ref' : 'RV$_{{COM, ref}} [km/s]$',
     }
 
     if param_list is None:
