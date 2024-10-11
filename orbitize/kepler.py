@@ -142,13 +142,9 @@ def calc_orbit(
         dedot = np.zeros(raoff.shape)
         zdot = np.zeros(raoff.shape)
 
-        for i in range(len(epochs)):
-            xyz_res = kepler_to_xyz(np.array([sma]), np.array([ecc]), np.array([inc]),
-                                    np.array([aop]), np.array([pan]), np.array([tau]), np.array([mtot]),
-                                    np.array([plx]), epochs[i], eanom[i])
-            radot[i] = (xyz_res[3]*u.km/u.s).to(u.pc/u.yr).value
-            dedot[i] = (xyz_res[4] * u.km / u.s).to(u.pc / u.yr).value
-            zdot[i] = (xyz_res[5] * u.km / u.s).to(u.pc / u.yr).value
+        if not np.isscalar(sma): raise ValueError("The Cartesian version of Kepler.calc_orbit currently only supports scalar orbital parameters (not arrays)")
+
+        xyz_res = kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs, eanom)
 
         return raoff, deoff, zoff, radot, dedot, zdot
 
@@ -424,8 +420,7 @@ def _CUDA_mikkola_solver(manom, ecc):
     return eanom
 
 
-def kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs,
-                  eanom):
+def kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs, eanom):
     if ecc == 0:
         ecc = 1e-8
     if inc == 0:
@@ -467,20 +462,17 @@ def kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs,
     T_32 = np.cos(aop) * np.sin(inc)
     T_33 = np.cos(inc)
 
+    # Stack transformation matrices
     T = np.array([[T_11, T_12, T_13],
                   [T_21, T_22, T_23],
                   [T_31, T_32, T_33]])
 
-    pos_xyz = np.zeros((len(sma), 3))
-    vel_xyz = np.zeros((len(sma), 3))
-    for k in range(len(sma)):
-        pos_xyz[k, :] = np.matmul(T[:, :, k], pos[k])
-        vel_xyz[k, :] = np.matmul(T[:, :, k], vel[k])
+    # Vectorized position and velocity transformation
+    pos_xyz = np.einsum('ij,nj->ni', T, pos)
+    vel_xyz = np.einsum('ij,nj->ni', T, vel)
 
     result = np.stack(
-        [-pos_xyz[:, 0], pos_xyz[:, 1], pos_xyz[:, 2], -vel_xyz[:, 0], vel_xyz[:, 1], vel_xyz[:, 2], plx, mtot])
-
-    if len(sma) == 1:
-        result = result.T
+        [-pos_xyz[:, 0], pos_xyz[:, 1], pos_xyz[:, 2], -vel_xyz[:, 0], vel_xyz[:, 1], vel_xyz[:, 2]])
 
     return np.squeeze(result)
+
