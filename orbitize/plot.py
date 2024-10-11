@@ -94,7 +94,12 @@ def plot_corner(results, param_list=None, **corner_kwargs):
         'z' : '$Z_{0}$ [AU]',
         'xdot' : '$xdot_{0}$ [km/s]',
         'ydot' : '$ydot_{0}$ [km/s]',
-        'zdot' : '$zdot_{0}$ [km/s]'
+        'zdot' : '$zdot_{0}$ [km/s]',
+        'ra_com_ref' : 'RA$_{{COM,ref}} [deg]$',
+        'dec_com_ref' : 'Dec$_{{COM,ref}} [deg]$',
+        'pmra_com_ref' : '$\\alpha^{{*}}_{{COM,ref}}$ [mas/yr]$',
+        'pmdec_com_ref' : '$\\delta^_{{COM,ref}}$ [mas/yr]$',
+        'rv_com_ref' : 'RV$_{{COM, ref}}$ [km/s]$',
     }
 
     if param_list is None:
@@ -130,7 +135,7 @@ def plot_corner(results, param_list=None, **corner_kwargs):
             elif label_key == 'm0' or label_key == 'mtot' or label_key.startswith('plx'):
                 body_num = ""
                 # maintain original label key
-            elif label_key in ['pm_ra', 'pm_dec', 'alpha0', 'delta0']:
+            elif label_key in ['pm_ra', 'pm_dec', 'alpha0', 'delta0', 'ra_com_ref', 'dec_com_ref', 'pmra_com_ref', 'pmdec_com_ref', 'rv_com_ref']:
                 body_num = ""
             elif label_key.startswith("gamma") or label_key.startswith("sigma"):
                 body_num = ""
