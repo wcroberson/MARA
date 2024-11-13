@@ -145,6 +145,10 @@ def calc_orbit(
         if not np.isscalar(sma): raise ValueError("The Cartesian version of Kepler.calc_orbit currently only supports scalar orbital parameters (not arrays)")
 
         xyz_res = kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs, eanom)
+        # SET RADOT, DEDOT, ZDOT TO THEIR VARIOUS TERMS IN XYZ_RES
+        radot = xyz_res[3]
+        dedot = xyz_res[4]
+        zdot = xyz_res[5]
 
         return raoff, deoff, zoff, radot, dedot, zdot
 

@@ -605,6 +605,7 @@ class System(object):
                         for i in range(2, self.num_secondary_bodies + 1):
                             m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
                             mass -= m
+                    return_inf = True if mass <= 0 else False
                 else:
                     if use_msinmid_basis:
                         # Changing basis to fit in period and Msin(mi_d) for the planets
@@ -783,6 +784,7 @@ class System(object):
                                                                               orbit_xp[-1, 1, 0],
                                                                               orbit_yp[-1, 1, 0],
                                                                               orbit_zp[-1, 1, 0])
+
             # If indicated by orbital parameters, add perturbations due to a planet around the primary star
             if self.num_secondary_bodies > 1:
                 body_num = 2
@@ -897,6 +899,12 @@ class System(object):
             decoff[:, 1, 0] = decB2
             vz[:, 0, 0] = rvA3
             vz[:, 1, 0] = rvB2
+            if return_inf:
+                # THIS IS NOT!!! A PERMANENT FIX, NEED TO COME UP WITH A MORE CLEVER WAY OF DOING THIS
+                raoff[:, 0, 0] = np.inf
+                raoff[:, 1, 0] = -np.inf
+                decoff[:, 0, 0] = np.inf
+                decoff[:, 1, 0] = -np.inf
             return raoff, decoff, vz
 
         if self.fitting_basis == 'XYZ':
@@ -998,17 +1006,18 @@ class System(object):
                     if full_orbit_model:
                         rel_raoff = np.zeros(raoff.shape)
                         rel_decoff = np.zeros(raoff.shape)
-                        rel_raoff[:, 0, :] = raoff[:, 1, :] - raoff[:, 0, :]
+                        rel_raoff[:, 0, :] = (raoff[:, 1, :] - raoff[:, 0, :]) * np.cos(np.radians(decoff[:, 0, :]))
                         rel_decoff[:, 0, :] = decoff[:, 1, :] - decoff[:, 0, :]
-                        rel_raoff[:, 1, :] = raoff[:, 0, :] - raoff[:, 1, :]
+                        rel_raoff[:, 1, :] = (raoff[:, 0, :] - raoff[:, 1, :]) * np.cos(np.radians(decoff[:, 0, :]))
                         rel_decoff[:, 1, :] = decoff[:, 0, :] - decoff[:, 1, :]
                         sep, pa = radec2seppa(rel_raoff, rel_decoff)
+                        sep *= 3600*1000
                     else:
                         sep, pa = radec2seppa(raoff, decoff)
 
                     model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
-                    model[self.seppa[body_num], 1] = pa[self.seppa[body_num], body_num, :]
-
+                    model[self.seppa[body_num], 1] = np.nan # pa[self.seppa[body_num], body_num, :]
+                    # changed above to np.nan on 10-15-2024, since we are currently not measuring separation
                 # RV
                 if len(self.rv[body_num]) > 0:
                     model[self.rv[body_num], 0] = vz[self.rv[body_num], body_num, :]

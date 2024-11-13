@@ -339,6 +339,93 @@ class GaussianPrior(Prior):
         return lnprob
 
 
+class TruncatedGaussianPrior(Prior):
+    """Truncated Gaussian prior.
+
+    .. math::
+
+        \log(p(x|\sigma, \mu, a_{\text{trunc}}, b_{\text{trunc}})) \propto
+        -\frac{(x - \mu)^2}{2\sigma^2} \quad \text{for } x \in [a_{\text{trunc}}, b_{\text{trunc}}]
+
+    This represents a Gaussian distribution truncated at `a_trunc` and `b_trunc`.
+
+    Args:
+        mu (float): Mean of the distribution.
+        sigma (float): Standard deviation of the distribution.
+        a_trunc (float): Lower bound of truncation.
+        b_trunc (float): Upper bound of truncation.
+
+    (written) Bill Roberson, 2024 (adapted from GaussianPrior code)
+    """
+
+
+    def __init__(self, mu, sigma, a_trunc, b_trunc):
+        self.mu = mu
+        self.sigma = sigma
+        self.a = (a_trunc - mu) / sigma
+        self.b = (b_trunc - mu) / sigma
+
+    def __repr__(self):
+        return "Truncated Gaussian"
+
+    def transform_samples(self, u):
+        """
+        Transform uniform 1D samples, u, to samples drawn
+        from a truncated Gaussian distribution.
+
+        Args:
+            u (array of floats): list of samples with values 0 < u < 1.
+
+        Returns:
+            numpy array of floats: 1D u samples transformed to a Gaussian
+            distribution.
+        """
+
+        samples = scipy.stats.truncnorm.isf(
+            u, self.a, self.b, loc=self.mu, scale=self.sigma
+        )
+        return samples
+
+    def draw_samples(self, num_samples):
+        """
+        Draw positive samples from a truncated Gaussian distribution.
+        Negative samples will not be returned.
+
+        Args:
+            num_samples (float): the number of samples to generate
+
+        Returns:
+            numpy array of float: samples drawn from the appropriate
+            Gaussian distribution. Array has length `num_samples`.
+        """
+        samples = np.random.uniform(0, 1, num_samples)
+        samples = self.transform_samples(samples)
+
+        return samples
+
+    def compute_lnprob(self, element_array):
+        """
+        Compute log(probability) of an array of numbers wrt a truncated Gaussian distibution.
+        Numbers outside the range [a_trunc, b_trunc] return a probability of -inf.
+
+        Args:
+            element_array (float or np.array of float): array of numbers. We want the
+                probability of drawing each of these from the appopriate Gaussian
+                distribution
+
+        Returns:
+            numpy array of float: array of log(probability) values,
+            corresponding to the probability of drawing each of the numbers
+            in the input `element_array`.
+        """
+        lnprob = -0.5 * ((element_array - self.mu) / self.sigma) ** 2
+
+        bad_samples = np.where(np.logical_or(element_array < a_trunc, element_array > b_trunc))[0]
+        lnprob[bad_samples] = -np.inf
+
+        return lnprob
+
+
 class LogUniformPrior(Prior):
     """
     This is the probability distribution :math:`p(x) \\propto 1/x`
