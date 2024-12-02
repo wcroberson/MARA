@@ -823,9 +823,13 @@ class System(object):
                         else:
                             period = np.sqrt(sma ** 3 / (mass + m0))
                             # The following line actually calculates time of conjunction, because it is given tau_conj
+                            print('period', period)
+                            print('input tau', tau)
                             t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
-                            epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
+                            print('aop', argp)
+                            epp = timetrans_to_timeperi(t_conj, (period * u.yr).to(u.day).value, ecc, argp)
                             tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
+                            print('transformed tau', tau)
 
                     all_smas = params_arr[self.sma_indx]
                     all_smas[0] *= 1000 / plx
