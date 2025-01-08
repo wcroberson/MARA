@@ -922,16 +922,15 @@ def all_lnpriors(params, priors, check_per=False, param_idx=None):
     logp = 0.0
 
     if check_per:
-        sma1_as = param_arr[self.param_idx['sma_as1']]
-        plx = param_arr[self.param_idx['plx']]
+        sma1_as = params[param_idx['sma_as1']]
+        plx = params[param_idx['plx']]
         sma1 = sma1_as * 1000 / plx
-        per1 = param_arr[self.param_idx['P1']]
+        per1 = params[param_idx['P1']]
         mtot = sma1 ** 3 / per1 ** 2
-        m0 = param_arr[self.param_idx['M0']]
+        m0 = param_arr[param_idx['M0']]
         m1 = mtot - m0
-        for body in np.arange(self.num_secondary_bodies - 1):
-            body_num = body + 2
-            mass = (param_arr[self.param_idx['m' + body_num]] * u.Mearth).to(u.Msun).value
+        for key in [k for k in param_idx if k.startswith('m') and k[1:].isdigit()]:
+            mass = (params[param_idx[key]] * u.Mearth).to(u.Msun).value
             m1 -= mass
 
         if m1 < 0:

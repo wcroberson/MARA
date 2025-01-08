@@ -704,6 +704,11 @@ class MCMC(Sampler):
         self.num_walkers = num_walkers
         self.num_threads = num_threads
 
+        # Add attributes to check if special prior function keywords are needed
+        self.check_per = bool(self.system.fitting_basis == 'SHERAEM')
+        print('Making sure check_per (in sampler.py line 709) works ---', self.check_per)
+        self.param_idx = np.copy(self.system.param_idx) if self.check_per else None
+
         # create an empty results object
         self.results = orbitize.results.Results(
             self.system,
@@ -826,13 +831,15 @@ class MCMC(Sampler):
         """
         if include_logp:
             if np.ndim(params) == 1:
-                logp = orbitize.priors.all_lnpriors(params, self.priors)
+                logp = orbitize.priors.all_lnpriors(params, self.priors, check_per=self.check_per,
+                                                    param_idx=self.param_idx)
                 # escape if logp == -np.inf
                 if np.isinf(logp):
                     return -np.inf
             else:
                 logp = np.array(
-                    [orbitize.priors.all_lnpriors(pset, self.priors) for pset in params]
+                    [orbitize.priors.all_lnpriors(pset, self.priors, check_per=self.check_per,
+                                                  param_idx=self.param_idx) for pset in params]
                 )
         else:
             logp = 0  # don't include prior
@@ -873,7 +880,8 @@ class MCMC(Sampler):
 
             # convert posterior probability (returned by sampler objects) to likelihood (required by orbitize.results.Results)
             for i, orb in enumerate(self.post):
-                self.lnlikes[i] -= orbitize.priors.all_lnpriors(orb, self.priors)
+                self.lnlikes[i] -= orbitize.priors.all_lnpriors(orb, self.priors, check_per=self.check_per,
+                                                                param_idx=self.param_idx)
 
         # include fixed parameters in posterior
         self.post = self._fill_in_fixed_params(self.post)
@@ -999,6 +1007,10 @@ class MCMC(Sampler):
                     logpargs=[
                         self.priors,
                     ],
+                    logpkwargs={
+                        'check_per': self.check_per,
+                        'param_idx': self.param_idx,
+                    },
                 )
             else:
                 sampler = emcee.EnsembleSampler(
@@ -1293,7 +1305,8 @@ class MCMC(Sampler):
         # We're not done yet, however. There may be errors in covariant priors; run a check for that.
         else:
             for y in all_positions:
-                lnprob = orbitize.priors.all_lnpriors(y, self.priors)
+                lnprob = orbitize.priors.all_lnpriors(y, self.priors, check_per=self.check_per,
+                                                      param_idx=self.param_idx)
                 if not np.isfinite(lnprob).all():
                     raise ValueError(
                         "Attempting to start with walkers outside of prior support: covariant prior failure."
