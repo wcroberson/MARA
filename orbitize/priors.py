@@ -902,7 +902,7 @@ class ObsPrior(Prior):
             return 0
 
 
-def all_lnpriors(params, priors, check_per=False, param_idx=None):
+def all_lnpriors(params, priors, check_per=False, param_idx=None, check_sma=False):
     """
     Calculates log(prior probability) of a set of parameters and a list of priors
 
@@ -936,9 +936,19 @@ def all_lnpriors(params, priors, check_per=False, param_idx=None):
         if m1 < 0:
             return -np.inf
 
+    if check_sma:
+        sma_keys = [k for k in param_idx if k.startswith('sma') and k[3:].isdigit()]
+        if 'sma1' in sma_keys:
+            sma_keys.remove('sma1')
+        if len(sma_keys) >= 2:
+            for i in range(len(sma_keys) - 1):
+                sma_planet1 = params_arr[self.basis.standard_basis_idx[sma_keys[i]]]
+                sma_planet2 = params_arr[self.basis.standard_basis_idx[sma_keys[i + 1]]]
+                if sma_planet2 < sma_planet1:
+                    return -np.inf
+
     for param, prior in zip(params, priors):
         param = np.array([param])
-
         logp += prior.compute_lnprob(param)  # return a float
 
     return logp

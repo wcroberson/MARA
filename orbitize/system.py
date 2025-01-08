@@ -259,7 +259,6 @@ class System(object):
                 self.stellar_astrom_epochs, alpha0, delta0, alphadec0_epoch
             )
 
-
         self.secondary_mass_indx = [
             self.basis.standard_basis_idx[i]
             for i in self.basis.standard_basis_idx.keys()
@@ -416,9 +415,8 @@ class System(object):
 
             raoff, deoff, vz = nbody.calc_orbit(epochs, sma, ecc, inc, argp, lan, tau, plx, mtot, tau_ref_epoch=self.tau_ref_epoch, m_pl=m_pl, output_star=True)
 
-        elif not full_orbit_model:
+        elif self.fitting_basis != 'SHERAPM':
             for body_num in np.arange(self.num_secondary_bodies)+1:
-
                 sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
                 ecc = params_arr[self.basis.standard_basis_idx['ecc{}'.format(body_num)]]
                 inc = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
@@ -426,18 +424,15 @@ class System(object):
                 lan = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
                 tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
                 plx = params_arr[self.basis.standard_basis_idx['plx']]
-                if body_num == 1:
-                    sma *= 1000 / plx
+                '''if body_num == 1:
+                    sma *= 1000 / plx'''
 
                 if self.fit_secondary_mass:
-                    # This if statement has been changed with a workaround so
-                    # we can fit the secondary with period instead of mass
-
                     # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
                     mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
 
-                    if body_num == 1:
+                    '''if body_num == 1:
                         tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
                         mass = ((sma**3) / (mass**2)) - m0
                     else:
@@ -459,9 +454,9 @@ class System(object):
                             # The following line actually calculates time of conjunction, because it is given tau_conj
                             t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
                             epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
-                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
+                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)'''
 
-                    if use_msinmid_basis:
+                    '''if use_msinmid_basis:
                         # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
                         # We need to select all planets with sma < this planet.
                         all_incs = params_arr[self.inc_indx]
@@ -482,15 +477,15 @@ class System(object):
                         outside_orbit = np.where(all_smas > sma)
                         inside_masses = all_pl_masses[within_orbit]
                         mtot = np.sum(inside_masses) + m0
-                    else:
-                        all_smas = params_arr[self.sma_indx]
-                        all_smas[0] *= 1000 / plx
-                        within_orbit = np.where(all_smas <= sma)
-                        outside_orbit = np.where(all_smas > sma)
-                        all_pl_masses = params_arr[self.secondary_mass_indx]
-                        all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
-                        inside_masses = all_pl_masses[within_orbit]
-                        mtot = np.sum(inside_masses) + m0
+                    else:'''
+                    all_smas = params_arr[self.sma_indx]
+                    '''all_smas[0] *= 1000 / plx'''
+                    within_orbit = np.where(all_smas <= sma)
+                    outside_orbit = np.where(all_smas > sma)
+                    all_pl_masses = params_arr[self.secondary_mass_indx]
+                    '''all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0'''
+                    inside_masses = all_pl_masses[within_orbit]
+                    mtot = np.sum(inside_masses) + m0
 
                 else:
                     m_pl = np.zeros(self.num_secondary_bodies)
@@ -567,13 +562,10 @@ class System(object):
                             #print('mass ratio', masses[body_num]/mtots[body_num])
                             ra_perturb[:, other_body_num, :] += (masses[body_num]/mtots[body_num]) * ra_kepler[:, body_num, :]
                             dec_perturb[:, other_body_num, :] += (masses[body_num]/mtots[body_num]) * dec_kepler[:, body_num, :]'''
-            # Removed because it resets sma and I needed to prevent for a test on 5-21-2024
-            # Modified for TOLIMAN project
-            # Removed perturbations for easier calculation in 1 planet system, will need to
-            # think through for more planets
             raoff = ra_kepler  # + ra_perturb
             deoff = dec_kepler  # + dec_perturb
-        elif full_orbit_model:
+
+        else:
             if n_orbits != 1:
                 print('Error: The full orbit model can only be used for one set of orbital parameters at once')
                 return
@@ -968,7 +960,7 @@ class System(object):
         jitter = np.zeros((n_epochs, 2, n_orbits))
         gamma = np.zeros((n_epochs, 2, n_orbits))
 
-        if full_orbit_model:
+        if self.fitting_basis == 'SHERAPM':
             if len(self.rv[0]) > 0 and self.fit_secondary_mass:
                 # looping through instruments to get the gammas & jitters
                 for rv_idx in range(len(self.rv_instruments)):
@@ -1060,38 +1052,36 @@ class System(object):
             m_primary = params_arr[-1]
             total_mass = 0
             for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:
-                inc_planet = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
+                '''inc_planet = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
                 pan_planet = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
                 mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc_planet) +
                                  np.sin(np.pi / 2) * np.sin(inc_planet) * np.cos((107.7 * np.pi / 180) - pan_planet))
                 if use_msinmid_basis:
                     m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
-                else:
-                    m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
+                else:'''
+                m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
 
                 total_mass += m_planet
 
-                if fix_pa:
+                '''if fix_pa:
                     model[:, 0, :] += sep[:, body_num, :] * m_planet * \
                                       np.cos(((pa[:, body_num, :] - 107.7) * np.pi / 180))
-                else:
-                    model[:, 0, :] += sep[:, body_num, :] * m_planet * \
-                                      np.cos(((pa[:, body_num, :] - pa[:, 1,
-                                                                    :]) * np.pi / 180))
+                else:'''
+                model[:, 0, :] += sep[:, body_num, :] * m_planet * \
+                                  np.cos(((pa[:, body_num, :] - pa[:, 1,:]) * np.pi / 180))
             total_mass += m_primary
             model[:, 0, :] /= total_mass
             model[:, 1] = np.nan
 
-            if model_AB_sep:
-                model[:, 0, :] += sep[:, 1, :]
-
-            # Below sets model (and thus residuals) to inf if the smas are not ordered properly
+            '''if model_AB_sep:
+                model[:, 0, :] += sep[:, 1, :]'''
+            '''# Below sets model (and thus residuals) to inf if the smas are not ordered properly
             if self.num_secondary_bodies > 2:
                 for body_num in np.arange(self.num_secondary_bodies)[2:]:
                     sma_planet1 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
                     sma_planet2 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num + 1)]]
                     if sma_planet2 < sma_planet1:
-                        model[:, 0, :] = np.inf
+                        model[:, 0, :] = np.inf'''
 
             # if we have abs astrometry measurements in the input file (i.e. not
             # from Hipparcos or Gaia), add the parallactic & proper motion here by
