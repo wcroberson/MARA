@@ -362,6 +362,8 @@ class TruncatedGaussianPrior(Prior):
     def __init__(self, mu, sigma, a_trunc, b_trunc):
         self.mu = mu
         self.sigma = sigma
+        self.a_trunc = a_trunc
+        self.b_trunc = b_trunc
         self.a = (a_trunc - mu) / sigma
         self.b = (b_trunc - mu) / sigma
 
@@ -420,7 +422,7 @@ class TruncatedGaussianPrior(Prior):
         """
         lnprob = -0.5 * ((element_array - self.mu) / self.sigma) ** 2
 
-        bad_samples = np.where(np.logical_or(element_array < a_trunc, element_array > b_trunc))[0]
+        bad_samples = np.where(np.logical_or(element_array < self.a_trunc, element_array > self.b_trunc))[0]
         lnprob[bad_samples] = -np.inf
 
         return lnprob
@@ -900,18 +902,40 @@ class ObsPrior(Prior):
             return 0
 
 
-def all_lnpriors(params, priors):
+def all_lnpriors(params, priors, check_per=False, param_idx=None):
     """
     Calculates log(prior probability) of a set of parameters and a list of priors
 
     Args:
         params (np.array): size of N parameters
         priors (list): list of N prior objects corresponding to each parameter
+        check_per (bool): if True, assumes the use of a SHERA basis which converts
+                            from secondary period to secondary mass, requiring a
+                            check. Defaults to False
+        param_idx (dict): dictionary with param labels as keys and indices of those
+                            parameters in the array params as values. Only needed
+                            when check_per is True.
 
     Returns:
         float: prior probability of this set of parameters
     """
     logp = 0.0
+
+    if check_per:
+        sma1_as = param_arr[self.param_idx['sma_as1']]
+        plx = param_arr[self.param_idx['plx']]
+        sma1 = sma1_as * 1000 / plx
+        per1 = param_arr[self.param_idx['P1']]
+        mtot = sma1 ** 3 / per1 ** 2
+        m0 = param_arr[self.param_idx['M0']]
+        m1 = mtot - m0
+        for body in np.arange(self.num_secondary_bodies - 1):
+            body_num = body + 2
+            mass = (param_arr[self.param_idx['m' + body_num]] * u.Mearth).to(u.Msun).value
+            m1 -= mass
+
+        if m1 < 0:
+            return -np.inf
 
     for param, prior in zip(params, priors):
         param = np.array([param])

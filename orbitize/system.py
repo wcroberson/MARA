@@ -946,7 +946,10 @@ class System(object):
                     a 2d array, otherwise it is a 3d array.
         """
         to_convert = np.copy(params_arr)
-        standard_params_arr = self.basis.to_standard_basis(to_convert)
+        try:
+            standard_params_arr = self.basis.to_standard_basis(to_convert)
+        except TypeError:
+            standard_params_arr = self.basis.to_standard_basis(to_convert, self.tau_ref_epoch)
 
         if use_rebound:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, comp_rebound=True,
