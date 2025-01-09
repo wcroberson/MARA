@@ -151,7 +151,6 @@ class Basis(abc.ABC):
         else:
             priors_arr.append(self.stellar_or_system_mass)
 
-
 class SHERAPM(Basis):
     '''
     Standard basis set based upon the 6 standard Keplarian elements: (sma, ecc, inc, aop, pan, tau).
@@ -738,13 +737,13 @@ class SemiAmp(Basis):
 class SHERAEM(Basis):
     '''
         Standard basis set to be used for SHERA easy mode orbit fits. The basis uses a variation of the 6 standard
-    	Keplarian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
-    	plx is needed to convert and tau is replaced with epp. For the planets the only difference is that tau is
-    	replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calcualted
-    	with the epoch at which the planet's PA is at a set point, which should be set to be 90 degrees offset from
-    	the PA of the secondary during the observing window (this is done to tau0 corresponds to the time when the
-    	delta sep curve passes 0, making it similar to time of conjunction for RV orbit fits). For masses, the planetary
-    	masses are given in Earth masses, while stellar mass is given in solar masses.
+        Keplarian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
+        plx is needed to convert and tau is replaced with epp. For the planets the only difference is that tau is
+        replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calcualted
+        with the epoch at which the planet's PA is at a set point, which should be set to be 90 degrees offset from
+        the PA of the secondary during the observing window (this is done to tau0 corresponds to the time when the
+        delta sep curve passes 0, making it similar to time of conjunction for RV orbit fits). For masses, the planetary
+        masses are given in Earth masses, while stellar mass is given in solar masses.
 
         Args:
             stellar_or_system_mass (float): mass of the primary star (if fitting for
@@ -765,7 +764,7 @@ class SHERAEM(Basis):
 
     def __init__(self, stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies, fit_secondary_mass,
                  angle_upperlim=2 * np.pi, hipparcos_IAD=None, rv=False, rv_instruments=None):
-        super(Standard, self).__init__(stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies,
+        super(SHERAEM, self).__init__(stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies,
                                        fit_secondary_mass, angle_upperlim, hipparcos_IAD, rv, rv_instruments)
 
     def construct_priors(self):
@@ -869,14 +868,14 @@ class SHERAEM(Basis):
         # Convert taupa to tau for planetary companions
         for body in np.arange(self.num_secondary_bodies - 1):
             body_num = body + 2
-            sma = param_arr[self.param_idx['sma' + body_num]]
-            mass = (param_arr[self.param_idx['m' + body_num]] * u.Mearth).to(u.Msun).value
+            sma = param_arr[self.param_idx['sma' + str(body_num)]]
+            mass = (param_arr[self.param_idx['m' + str(body_num)]] * u.Mearth).to(u.Msun).value
             period = np.sqrt(sma ** 3 / (mass + m0))
-            taupa = param_arr[self.param_idx['taupa' + body_num]]
+            taupa = param_arr[self.param_idx['taupa' + str(body_num)]]
             t_PA = tau_to_tp(taupa, tau_ref_epoch, period)
-            inc = param_arr[self.param_idx['inc' + body_num]]
-            pan = param_arr[self.param_idx['pan' + body_num]]
-            sma = param_arr[self.param_idx['sma' + body_num]]
+            inc = param_arr[self.param_idx['inc' + str(body_num)]]
+            pan = param_arr[self.param_idx['pan' + str(body_num)]]
+            aop = param_arr[self.param_idx['aop' + str(body_num)]]
             cx = (np.cos(inc) * np.sin(aop) * np.cos(pan)) + (np.cos(aop) * np.sin(pan))
             sx = (np.cos(inc) * np.cos(aop) * np.cos(pan)) - (np.sin(aop) * np.sin(pan))
             cy = (np.cos(aop) * np.cos(pan)) - (np.cos(inc) * np.sin(aop) * np.sin(pan))
@@ -890,13 +889,13 @@ class SHERAEM(Basis):
                 np.cos(PA)) else cy * np.cos(nu_PA) + sy * np.sin(nu_PA)
             if np.sign(pa_sign_match) != np.sign(nu_sign_match):
                 nu_PA = (nu_PA + np.pi) % (2 * np.pi)
-            ecc = param_arr[self.param_idx['ecc' + body_num]]
+            ecc = param_arr[self.param_idx['ecc' + str(body_num)]]
             eanom = 2 * np.arctan2(np.sqrt((1 - ecc) / (1 + ecc)) * np.sin(nu_PA / 2), np.cos(nu_PA / 2))
             manom = eanom - ecc * np.sin(eanom)
             tp = t_PA - (period * u.yr).to(u.day).value * manom / 2 / np.pi
             tau = tp_to_tau(tp, tau_ref_epoch, period)
-            param_arr[self.param_idx['taupa' + body_num]] = tau
-            param_arr[self.param_idx['m' + body_num]] = mass
+            param_arr[self.param_idx['taupa' + str(body_num)]] = tau
+            param_arr[self.param_idx['m' + str(body_num)]] = mass
 
             # Subtract planetary companion mass from converted m1
             m1 -= mass
