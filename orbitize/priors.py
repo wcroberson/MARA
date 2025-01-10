@@ -927,9 +927,9 @@ def all_lnpriors(params, priors, check_per=False, param_idx=None, check_sma=Fals
         sma1 = sma1_as * 1000 / plx
         per1 = params[param_idx['P1']]
         mtot = sma1 ** 3 / per1 ** 2
-        m0 = param_arr[param_idx['M0']]
+        m0 = params[param_idx['M0']]
         m1 = mtot - m0
-        for key in [k for k in param_idx if k.startswith('m') and k[1:].isdigit()]:
+        for key in [k for k in param_idx.keys() if k.startswith('m') and k[1:].isdigit()]:
             mass = (params[param_idx[key]] * u.Mearth).to(u.Msun).value
             m1 -= mass
 
@@ -937,13 +937,13 @@ def all_lnpriors(params, priors, check_per=False, param_idx=None, check_sma=Fals
             return -np.inf
 
     if check_sma:
-        sma_keys = [k for k in param_idx if k.startswith('sma') and k[3:].isdigit()]
+        sma_keys = [k for k in param_idx.keys() if k.startswith('sma') and k[3:].isdigit()]
         if 'sma1' in sma_keys:
             sma_keys.remove('sma1')
         if len(sma_keys) >= 2:
             for i in range(len(sma_keys) - 1):
-                sma_planet1 = params_arr[self.basis.standard_basis_idx[sma_keys[i]]]
-                sma_planet2 = params_arr[self.basis.standard_basis_idx[sma_keys[i + 1]]]
+                sma_planet1 = params[param_idx[sma_keys[i]]]
+                sma_planet2 = params[param_idx[sma_keys[i + 1]]]
                 if sma_planet2 < sma_planet1:
                     return -np.inf
 

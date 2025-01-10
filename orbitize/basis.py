@@ -826,8 +826,10 @@ class SHERAEM(Basis):
         self.param_idx = dict(zip(basis_labels, np.arange(len(basis_labels))))
         self.standard_basis_idx = dict(zip(basis_labels, np.arange(len(basis_labels))))
 
+        self.standard_basis_idx['m0'] = self.param_idx['M0']
         self.standard_basis_idx['m1'] = self.param_idx['P1']
         self.standard_basis_idx['sma1'] = self.param_idx['sma_as1']
+        self.standard_basis_idx['tau1'] = self.param_idx['epp1']
 
         for body in np.arange(self.num_secondary_bodies - 1):
             body_num = body + 2

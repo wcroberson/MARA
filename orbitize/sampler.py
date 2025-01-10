@@ -20,6 +20,7 @@ from orbitize import cuda_ext
 
 import orbitize.results
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 
 class Sampler(abc.ABC):
@@ -706,8 +707,8 @@ class MCMC(Sampler):
 
         # Add attributes to check if special prior function keywords are needed
         self.check_per = bool(self.system.fitting_basis == 'SHERAEM')
-        print('Making sure check_per (in sampler.py line 709) works ---', self.check_per)
-        self.param_idx = np.copy(self.system.param_idx) if self.check_per else None
+        #print('Making sure check_per (in sampler.py line 709) works ---', self.check_per)
+        self.param_idx = deepcopy(self.system.param_idx) if self.check_per else None
         self.check_sma = bool(self.system.num_secondary_bodies > 2)
 
         # create an empty results object

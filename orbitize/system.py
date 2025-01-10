@@ -268,7 +268,7 @@ class System(object):
         self.sma_indx = [
             self.basis.standard_basis_idx[i]
             for i in self.basis.standard_basis_idx.keys()
-            if (i.startswith("sma"))
+            if (i.startswith("sma") and not i.startswith("sma_as"))
         ]
         self.ecc_indx = [
             self.basis.standard_basis_idx[i]
@@ -424,66 +424,16 @@ class System(object):
                 lan = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
                 tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
                 plx = params_arr[self.basis.standard_basis_idx['plx']]
-                '''if body_num == 1:
-                    sma *= 1000 / plx'''
 
                 if self.fit_secondary_mass:
                     # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
                     mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
 
-                    '''if body_num == 1:
-                        tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
-                        mass = ((sma**3) / (mass**2)) - m0
-                    else:
-                        if use_msinmid_basis:
-                            # Changing basis to fit in period and Msin(mi_d) for the planets
-                            # The following line actually calculates time of conjunction, because it is given tau_conj
-                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
-                            epp = timetrans_to_timeperi(t_conj, sma, ecc, argp)
-                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
-
-                            mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc) +
-                                             np.sin(np.pi / 2) * np.sin(inc) * np.cos((107.7 * np.pi / 180) - lan))  # 120 degrees is only roughly right, should do it more rigorously
-
-                            mass /= np.sin(mi_d)
-
-                            sma = (sma ** 2 * (mass + m0)) ** (1 / 3)
-                        else:
-                            period = np.sqrt(sma ** 3 / (mass + m0))
-                            # The following line actually calculates time of conjunction, because it is given tau_conj
-                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
-                            epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
-                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)'''
-
-                    '''if use_msinmid_basis:
-                        # For what mtot to use to calculate central potential, we should use the mass enclosed in a sphere with r <= distance of planet.
-                        # We need to select all planets with sma < this planet.
-                        all_incs = params_arr[self.inc_indx]
-                        all_pans = params_arr[self.pan_indx]
-                        all_smas = params_arr[self.sma_indx]
-                        all_smas[0] *= 1000 / plx
-                        all_pl_masses = params_arr[self.secondary_mass_indx]
-                        for i in range(1, len(all_smas)):
-                            mi_d = np.arccos(
-                                np.cos(np.pi / 2) * np.cos(all_incs[i]) + np.sin(np.pi / 2) * np.sin(all_incs[i]) * np.cos(
-                                    (107.7 * np.pi / 180) - all_pans[i]))
-                            all_pl_masses[i] /= np.sin(mi_d)
-                        all_pl_masses[0] = ((all_smas[0] ** 3) / (all_pl_masses[0] ** 2)) - m0
-                        for i in range(1, len(all_smas)):
-                            all_smas[i] = (all_smas[i]**2 * (all_pl_masses[i] + m0))**(1/3)
-
-                        within_orbit = np.where(all_smas <= sma)
-                        outside_orbit = np.where(all_smas > sma)
-                        inside_masses = all_pl_masses[within_orbit]
-                        mtot = np.sum(inside_masses) + m0
-                    else:'''
                     all_smas = params_arr[self.sma_indx]
-                    '''all_smas[0] *= 1000 / plx'''
                     within_orbit = np.where(all_smas <= sma)
                     outside_orbit = np.where(all_smas > sma)
                     all_pl_masses = params_arr[self.secondary_mass_indx]
-                    '''all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0'''
                     inside_masses = all_pl_masses[within_orbit]
                     mtot = np.sum(inside_masses) + m0
 
@@ -520,50 +470,8 @@ class System(object):
                     vz0 = np.reshape(vz_i * -(mass / m0), (n_epochs, n_orbits)) # calculating stellar velocity due to ith companion
                     vz[:, 0, :] += vz0  # adding stellar velocity and gamma
 
-            # if we are fitting for the mass of the planets, then they will perturb the star
-            # add the perturbation on the star due to this planet on the relative astrometry of the planet that was measured
-            # We are superimposing the Keplerian orbits, so we can add it linearly, scaled by the mass.
-            # Because we are in Jacobi coordinates, for companions, we only should model the effect of planets interior to it.
-            # (Jacobi coordinates mean that separation for a given companion is measured relative to the barycenter of all interior companions)
-            '''if self.track_planet_perturbs:
-                for body_num in np.arange(self.num_secondary_bodies + 1):
-
-                    if body_num > 0:
-                        # for companions, only perturb companion orbits at larger SMAs than this one.
-                        sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
-                        all_smas = params_arr[self.sma_indx]
-                        outside_orbit = np.where(all_smas > sma)[0]
-                        which_perturb_bodies = outside_orbit + 1
-
-                        # the planet will also perturb the star
-                        which_perturb_bodies = np.append([0], which_perturb_bodies)
-
-                    else:
-                        # for the star, what we are measuring is its position relative to the system barycenter
-                        # so we want to account for all of the bodies.
-                        which_perturb_bodies = np.arange(self.num_secondary_bodies+1)
-
-                    for other_body_num in which_perturb_bodies:
-                        # skip itself since the the 2-body problem is measuring the planet-star separation already
-                        if (body_num == other_body_num) | (body_num == 0):
-                            continue
-
-                        ## NOTE: we are only handling astrometry right now (TODO: integrate RV into this)
-                        # this computes the perturbation on the other body due to the current body
-
-                        # star is perturbed in opposite direction
-                        if other_body_num == 0:
-                            #print('perturb mtot', mtots[body_num])
-                            #print('primary mass ratio', masses[body_num] / mtots[body_num])
-                            ra_perturb[:, other_body_num, :] -= (masses[body_num]/mtots[body_num]) * ra_kepler[:, body_num, :]
-                            dec_perturb[:, other_body_num, :] -= (masses[body_num]/mtots[body_num]) * dec_kepler[:, body_num, :]
-
-                        else:
-                            #print('mass ratio', masses[body_num]/mtots[body_num])
-                            ra_perturb[:, other_body_num, :] += (masses[body_num]/mtots[body_num]) * ra_kepler[:, body_num, :]
-                            dec_perturb[:, other_body_num, :] += (masses[body_num]/mtots[body_num]) * dec_kepler[:, body_num, :]'''
-            raoff = ra_kepler  # + ra_perturb
-            deoff = dec_kepler  # + dec_perturb
+            raoff = ra_kepler
+            deoff = dec_kepler
 
         else:
             if n_orbits != 1:
