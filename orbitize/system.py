@@ -821,7 +821,7 @@ class System(object):
             return raoff, deoff, vz
 
     def compute_model(self, params_arr, use_rebound=False, fix_pa=False, use_msinmid_basis=False,
-                      model_AB_sep=False, full_orbit_model=True):
+                      model_AB_sep=False, full_orbit_model=False):
         """
         Compute model predictions for an array of fitting parameters.
         Calls the above compute_all_orbits() function, adds jitter/gamma to
@@ -906,17 +906,14 @@ class System(object):
 
                 # Sep/PA
                 if len(self.seppa[body_num]) > 0:
-                    if full_orbit_model:
-                        rel_raoff = np.zeros(raoff.shape)
-                        rel_decoff = np.zeros(raoff.shape)
-                        rel_raoff[:, 0, :] = (raoff[:, 1, :] - raoff[:, 0, :]) * np.cos(np.radians(decoff[:, 0, :]))
-                        rel_decoff[:, 0, :] = decoff[:, 1, :] - decoff[:, 0, :]
-                        rel_raoff[:, 1, :] = (raoff[:, 0, :] - raoff[:, 1, :]) * np.cos(np.radians(decoff[:, 0, :]))
-                        rel_decoff[:, 1, :] = decoff[:, 0, :] - decoff[:, 1, :]
-                        sep, pa = radec2seppa(rel_raoff, rel_decoff)
-                        sep *= 3600*1000
-                    else:
-                        sep, pa = radec2seppa(raoff, decoff)
+                    rel_raoff = np.zeros(raoff.shape)
+                    rel_decoff = np.zeros(raoff.shape)
+                    rel_raoff[:, 0, :] = (raoff[:, 1, :] - raoff[:, 0, :]) * np.cos(np.radians(decoff[:, 0, :]))
+                    rel_decoff[:, 0, :] = decoff[:, 1, :] - decoff[:, 0, :]
+                    rel_raoff[:, 1, :] = (raoff[:, 0, :] - raoff[:, 1, :]) * np.cos(np.radians(decoff[:, 0, :]))
+                    rel_decoff[:, 1, :] = decoff[:, 0, :] - decoff[:, 1, :]
+                    sep, pa = radec2seppa(rel_raoff, rel_decoff)
+                    sep *= 3600*1000
 
                     model[self.seppa[body_num], 0] = sep[self.seppa[body_num], body_num, :]
                     model[self.seppa[body_num], 1] = np.nan # pa[self.seppa[body_num], body_num, :]
@@ -957,7 +954,7 @@ class System(object):
                     gamma[self.rv_inst_indices[rv_idx], 1] = np.nan
 
             sep, pa = radec2seppa(raoff, decoff) # comment out loop above due to this line
-            m_primary = params_arr[-1]
+            m_primary = standard_params_arr[-1]
             total_mass = 0
             for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:
                 '''inc_planet = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
@@ -967,7 +964,7 @@ class System(object):
                 if use_msinmid_basis:
                     m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
                 else:'''
-                m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
+                m_planet = standard_params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
 
                 total_mass += m_planet
 
