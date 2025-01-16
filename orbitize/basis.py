@@ -763,8 +763,184 @@ class SHERAEM(Basis):
         '''
 
     def __init__(self, stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies, fit_secondary_mass,
-                 angle_upperlim=2 * np.pi, hipparcos_IAD=None, rv=False, rv_instruments=None):
+                 angle_upperlim=2 * np.pi, hipparcos_IAD=None, rv=False, rv_instruments=None, PA=110 * np.pi / 180):
         super(SHERAEM, self).__init__(stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies,
+                                       fit_secondary_mass, angle_upperlim, hipparcos_IAD, rv, rv_instruments)
+        self.PA = PA
+
+    def construct_priors(self):
+        '''
+        Generates the parameter label array and initializes the corresponding priors for each
+        parameter that's to be sampled. For the standard basis, the parameters common to each
+        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
+        and mass priors are added at the end.
+
+        Returns:
+            tuple:
+
+                list: list of strings (labels) that indicate the names of each parameter to sample
+
+                list: list of orbitize.priors.Prior objects that indicate the prior distribution of each label
+        '''
+        binary_base_labels = ['sma_as', 'ecc', 'inc', 'aop', 'pan', 'epp']
+        planet_base_labels = ['sma', 'ecc', 'inc', 'aop', 'pan', 'taupa']
+
+        basis_priors = []
+        basis_labels = []
+
+        # Add the priors for the binary
+        for elem in binary_base_labels:
+            basis_priors.append(self.default_priors[elem])
+            basis_labels.append(elem + str(1))
+
+        # Add the priors common to each planetary companion
+        for body in np.arange(self.num_secondary_bodies - 1):
+            for elem in planet_base_labels:
+                basis_priors.append(self.default_priors[elem])
+                basis_labels.append(elem + str(body + 2))
+
+        # Add parallax prior
+        basis_labels.append('plx')
+        if self.plx_err > 0:
+            basis_priors.append(priors.GaussianPrior(self.plx, self.plx_err))
+        else:
+            basis_priors.append(self.plx)
+
+        # Add hippparcos priors if necessary
+        if self.hipparcos_IAD is not None:
+            self.set_hip_iad_priors(basis_priors, basis_labels)
+
+        # Add rv priors
+        if self.rv and self.fit_secondary_mass:
+            self.set_rv_priors(basis_priors, basis_labels)
+
+        # Add mass priors
+        basis_labels.append('P1')
+        basis_priors.append(priors.LogUniformPrior(0.1, 1e3))
+        for body in np.arange(self.num_secondary_bodies - 1):
+            basis_labels.append('m' + str(body + 2))
+            basis_priors.append(priors.LogUniformPrior(0.1, 1e4))
+        basis_labels.append('M0')
+        basis_priors.append(priors.LogUniformPrior(0.01, 1e2))
+
+        # Define param label dictionary in current basis & standard basis
+        self.param_idx = dict(zip(basis_labels, np.arange(len(basis_labels))))
+        self.standard_basis_idx = dict(zip(basis_labels, np.arange(len(basis_labels))))
+
+        self.standard_basis_idx['m0'] = self.param_idx['M0']
+        self.standard_basis_idx['m1'] = self.param_idx['P1']
+        self.standard_basis_idx['sma1'] = self.param_idx['sma_as1']
+        self.standard_basis_idx['tau1'] = self.param_idx['epp1']
+
+        for body in np.arange(self.num_secondary_bodies - 1):
+            body_num = body + 2
+            self.standard_basis_idx['tau{}'.format(body_num)] = self.param_idx['taupa{}'.format(body_num)]
+
+        return basis_priors, basis_labels
+
+    def to_standard_basis(self, param_arr, tau_ref_epoch):
+        '''
+        Converts the SHERA easy mode basis to the standard orbitize basis.
+
+        Args:
+            param_arr (np.array of float): RxM array of fitting parameters in the SHERAEM basis,
+                where R is the number of parameters being fit, and M is the number of orbits. If
+                M=1 (for MCMC), this can be a 1d array.
+
+        Returns:
+            np.array of float: ``param_arr`` converted to the standard basis
+        '''
+
+        # Convert binary sma from arcsec to AU
+        sma1_as = param_arr[self.param_idx['sma_as1']]
+        plx = param_arr[self.param_idx['plx']]
+        sma1 = sma1_as * 1000 / plx
+        param_arr[self.param_idx['sma_as1']] = sma1
+
+        # Convert binary period to secondary mass (plus the mass of planetary companions)
+        per1 = param_arr[self.param_idx['P1']]
+        mtot = sma1 ** 3 / per1 ** 2
+        m0 = param_arr[self.param_idx['M0']]
+        m1 = mtot - m0
+
+        # Convert binary epp to tau
+        epp1 = param_arr[self.param_idx['epp1']]
+        tau1 = tp_to_tau(epp1, tau_ref_epoch, per1)
+        param_arr[self.param_idx['epp1']] = tau1
+
+        # Convert taupa to tau for planetary companions
+        for body in np.arange(self.num_secondary_bodies - 1):
+            body_num = body + 2
+            sma = param_arr[self.param_idx['sma' + str(body_num)]]
+            mass = (param_arr[self.param_idx['m' + str(body_num)]] * u.Mearth).to(u.Msun).value
+            period = np.sqrt(sma ** 3 / (mass + m0))
+            taupa = param_arr[self.param_idx['taupa' + str(body_num)]]
+            t_PA = tau_to_tp(taupa, tau_ref_epoch, period)
+            inc = param_arr[self.param_idx['inc' + str(body_num)]]
+            pan = param_arr[self.param_idx['pan' + str(body_num)]]
+            aop = param_arr[self.param_idx['aop' + str(body_num)]]
+            cx = (np.cos(inc) * np.sin(aop) * np.cos(pan)) + (np.cos(aop) * np.sin(pan))
+            sx = (np.cos(inc) * np.cos(aop) * np.cos(pan)) - (np.sin(aop) * np.sin(pan))
+            cy = (np.cos(aop) * np.cos(pan)) - (np.cos(inc) * np.sin(aop) * np.sin(pan))
+            sy = -(np.sin(aop) * np.cos(pan)) - (np.cos(inc) * np.cos(aop) * np.sin(pan))
+            PA = self.PA
+            print(PA)
+            cyp = cy * np.tan(PA)
+            syp = sy * np.tan(PA)
+            nu_PA = np.arctan((cyp - cx) / (sx - syp))
+            pa_sign_match = np.sin(PA) if np.abs(np.sin(PA)) > np.abs(np.cos(PA)) else np.cos(PA)
+            nu_sign_match = cx * np.cos(nu_PA) + sx * np.sin(nu_PA) if np.abs(np.sin(PA)) > np.abs(
+                np.cos(PA)) else cy * np.cos(nu_PA) + sy * np.sin(nu_PA)
+            if np.sign(pa_sign_match) != np.sign(nu_sign_match):
+                nu_PA = (nu_PA + np.pi) % (2 * np.pi)
+            ecc = param_arr[self.param_idx['ecc' + str(body_num)]]
+            eanom = 2 * np.arctan2(np.sqrt((1 - ecc) / (1 + ecc)) * np.sin(nu_PA / 2), np.cos(nu_PA / 2))
+            manom = eanom - ecc * np.sin(eanom)
+            tp = t_PA - (period * u.yr).to(u.day).value * manom / 2 / np.pi
+            tau = tp_to_tau(tp, tau_ref_epoch, period)
+            param_arr[self.param_idx['taupa' + str(body_num)]] = tau
+            param_arr[self.param_idx['m' + str(body_num)]] = mass
+
+            # Subtract planetary companion mass from converted m1
+            m1 -= mass
+
+        # Set secondary mass in param_arr
+        param_arr[self.param_idx['P1']] = m1
+
+        return param_arr
+
+
+class SHERAEM_coplanar(Basis):
+    '''
+        Standard basis set to be used for SHERA easy mode orbit fits. The basis uses a variation of the 6 standard
+        Keplarian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
+        plx is needed to convert and tau is replaced with epp. For the planets the only difference is that tau is
+        replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calcualted
+        with the epoch at which the planet's PA is at a set point, which should be set to be 90 degrees offset from
+        the PA of the secondary during the observing window (this is done to tau0 corresponds to the time when the
+        delta sep curve passes 0, making it similar to time of conjunction for RV orbit fits). For masses, the planetary
+        masses are given in Earth masses, while stellar mass is given in solar masses.
+
+        Args:
+            stellar_or_system_mass (float): mass of the primary star (if fitting for
+                dynamical masses of both components) or total system mass (if
+                fitting using relative astrometry only) [M_sol]
+            mass_err (float): uncertainty on 'stellar_or_system_mass', in M_sol
+            plx (float): mean parallax of the system, in mas
+            plx_err (float): uncertainty on 'plx', in mas
+            num_secondary_bodies (int): number of secondary bodies in the system, should be at least 1
+            fit_secondary_mass (bool): if True, include the dynamical mass of orbitting body as fitted parameter, if False,
+                'stellar_or_system_mass' is taken to be total mass
+            angle_upperlim (float): either pi or 2pi, to restrict the prior range for 'pan' parameter (default: 2pi)
+            hipparcos_IAD (orbitize.HipparcosLogProb object): if not 'None', then add relevant priors to this data (default: None)
+            rv (bool): if True, then there is radial velocity data and assign radial velocity priors, if False, then there
+                is no radial velocity data and radial velocity priors are not assigned (default: False)
+            rv_instruments (np.array): array of unique rv instruments from the originally supplied data (default: None)
+        '''
+
+    def __init__(self, stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies, fit_secondary_mass,
+                 angle_upperlim=2 * np.pi, hipparcos_IAD=None, rv=False, rv_instruments=None):
+        super(SHERAEM_coplanar, self).__init__(stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies,
                                        fit_secondary_mass, angle_upperlim, hipparcos_IAD, rv, rv_instruments)
 
     def construct_priors(self):

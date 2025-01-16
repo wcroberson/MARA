@@ -75,6 +75,7 @@ class System(object):
         gaia=None,
         fitting_basis="Standard",
         use_rebound=False,
+        PA=None
     ):
         self.num_secondary_bodies = num_secondary_bodies
         self.data_table = data_table
@@ -89,6 +90,7 @@ class System(object):
         self.gaia = gaia
         self.fitting_basis = fitting_basis
         self.use_rebound = use_rebound
+        self.PA = PA
 
         self.best_epochs = []
         self.input_table = self.data_table.copy()
@@ -232,6 +234,9 @@ class System(object):
                 "best_epoch_idx": self.best_epoch_idx,
                 "epochs": epochs,
             }
+
+        if self.fitting_basis == 'SHERAEM':
+            self.extra_basis_kwargs["PA"] = self.PA
 
         self.basis = basis_obj(
             self.stellar_or_system_mass, self.mass_err, self.plx, self.plx_err, self.num_secondary_bodies,
