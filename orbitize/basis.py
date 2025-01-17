@@ -884,7 +884,6 @@ class SHERAEM(Basis):
             cy = (np.cos(aop) * np.cos(pan)) - (np.cos(inc) * np.sin(aop) * np.sin(pan))
             sy = -(np.sin(aop) * np.cos(pan)) - (np.cos(inc) * np.cos(aop) * np.sin(pan))
             PA = self.PA
-            print(PA)
             cyp = cy * np.tan(PA)
             syp = sy * np.tan(PA)
             nu_PA = np.arctan((cyp - cx) / (sx - syp))
