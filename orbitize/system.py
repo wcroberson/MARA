@@ -962,36 +962,15 @@ class System(object):
             m_primary = standard_params_arr[-1]
             total_mass = 0
             for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:
-                '''inc_planet = params_arr[self.basis.standard_basis_idx['inc{}'.format(body_num)]]
-                pan_planet = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
-                mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc_planet) +
-                                 np.sin(np.pi / 2) * np.sin(inc_planet) * np.cos((107.7 * np.pi / 180) - pan_planet))
-                if use_msinmid_basis:
-                    m_planet = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]] / np.sin(mi_d)
-                else:'''
                 m_planet = standard_params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
-
                 total_mass += m_planet
 
-                '''if fix_pa:
-                    model[:, 0, :] += sep[:, body_num, :] * m_planet * \
-                                      np.cos(((pa[:, body_num, :] - 107.7) * np.pi / 180))
-                else:'''
                 model[:, 0, :] += sep[:, body_num, :] * m_planet * \
                                   np.cos(((pa[:, body_num, :] - pa[:, 1,:]) * np.pi / 180))
+
             total_mass += m_primary
             model[:, 0, :] /= total_mass
             model[:, 1] = np.nan
-
-            '''if model_AB_sep:
-                model[:, 0, :] += sep[:, 1, :]'''
-            '''# Below sets model (and thus residuals) to inf if the smas are not ordered properly
-            if self.num_secondary_bodies > 2:
-                for body_num in np.arange(self.num_secondary_bodies)[2:]:
-                    sma_planet1 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
-                    sma_planet2 = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num + 1)]]
-                    if sma_planet2 < sma_planet1:
-                        model[:, 0, :] = np.inf'''
 
             # if we have abs astrometry measurements in the input file (i.e. not
             # from Hipparcos or Gaia), add the parallactic & proper motion here by

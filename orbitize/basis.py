@@ -938,9 +938,10 @@ class SHERAEM_coplanar(Basis):
         '''
 
     def __init__(self, stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies, fit_secondary_mass,
-                 angle_upperlim=2 * np.pi, hipparcos_IAD=None, rv=False, rv_instruments=None):
+                 angle_upperlim=2 * np.pi, hipparcos_IAD=None, rv=False, rv_instruments=None, PA=110 * np.pi / 180):
         super(SHERAEM_coplanar, self).__init__(stellar_or_system_mass, mass_err, plx, plx_err, num_secondary_bodies,
                                        fit_secondary_mass, angle_upperlim, hipparcos_IAD, rv, rv_instruments)
+        self.PA = PA
 
     def construct_priors(self):
         '''
@@ -1024,7 +1025,6 @@ class SHERAEM_coplanar(Basis):
         Returns:
             np.array of float: ``param_arr`` converted to the standard basis
         '''
-
         # Convert binary sma from arcsec to AU
         sma1_as = param_arr[self.param_idx['sma_as1']]
         plx = param_arr[self.param_idx['plx']]
@@ -1045,6 +1045,11 @@ class SHERAEM_coplanar(Basis):
         # Convert taupa to tau for planetary companions
         for body in np.arange(self.num_secondary_bodies - 1):
             body_num = body + 2
+
+            # Convert coplanar params
+            param_arr[self.param_idx['inc' + str(body_num)]] = param_arr[self.param_idx['inc1']]
+            param_arr[self.param_idx['pan' + str(body_num)]] = param_arr[self.param_idx['pan1']]
+
             sma = param_arr[self.param_idx['sma' + str(body_num)]]
             mass = (param_arr[self.param_idx['m' + str(body_num)]] * u.Mearth).to(u.Msun).value
             period = np.sqrt(sma ** 3 / (mass + m0))
@@ -1057,7 +1062,7 @@ class SHERAEM_coplanar(Basis):
             sx = (np.cos(inc) * np.cos(aop) * np.cos(pan)) - (np.sin(aop) * np.sin(pan))
             cy = (np.cos(aop) * np.cos(pan)) - (np.cos(inc) * np.sin(aop) * np.sin(pan))
             sy = -(np.sin(aop) * np.cos(pan)) - (np.cos(inc) * np.cos(aop) * np.sin(pan))
-            PA = 110 * np.pi / 180  # EVENTUALLY WANT TO REPLACE THIS TO NOT BE HARDCODED
+            PA = self.PA
             cyp = cy * np.tan(PA)
             syp = sy * np.tan(PA)
             nu_PA = np.arctan((cyp - cx) / (sx - syp))
