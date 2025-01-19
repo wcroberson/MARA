@@ -235,7 +235,7 @@ class System(object):
                 "epochs": epochs,
             }
 
-        if self.fitting_basis == 'SHERAEM':
+        if self.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar']:
             self.extra_basis_kwargs["PA"] = self.PA
 
         self.basis = basis_obj(
