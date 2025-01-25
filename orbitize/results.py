@@ -309,23 +309,24 @@ class Results(object):
                 raise Exception(
                     'Unable to load file {} to Results object. append is set to False but object is not empty'.format(filename))
 
-    def print_results(self):
+    def print_results(self, file=None):
         """
         Prints median and 68% credible intervals alongside fitting labels
         """
 
-        print('\nparam: med [68% CI]')
-        print('-------------------\n')
+        print('\nparam: med [68% CI]', file=file)
+        print('-------------------\n', file=file)
         for i, l in enumerate(self.system.labels):
             print(
                 '{}: {:.3f} [{:.3f} - {:.3f}]'.format(
                     l, 
                     np.median(self.post[:,i]),
                     np.quantile(self.post[:,i], 0.16),
-                    np.quantile(self.post[:,i], 0.84)
+                    np.quantile(self.post[:,i], 0.84),
+                    file=file
                 )
             )
-        print('-------------------\n')
+        print('-------------------\n', file=file)
     
     def plot_corner(self, param_list=None, **corner_kwargs):
         """
