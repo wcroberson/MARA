@@ -322,9 +322,9 @@ class Results(object):
                     l, 
                     np.median(self.post[:,i]),
                     np.quantile(self.post[:,i], 0.16),
-                    np.quantile(self.post[:,i], 0.84),
-                    file=file
-                )
+                    np.quantile(self.post[:,i], 0.84)
+                ),
+                file=file
             )
         print('-------------------\n', file=file)
     
