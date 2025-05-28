@@ -958,7 +958,7 @@ class System(object):
                     ]
                     gamma[self.rv_inst_indices[rv_idx], 1] = np.nan
 
-            sep, pa = radec2seppa(raoff, decoff) # comment out loop above due to this line
+            sep, pa = radec2seppa(raoff, decoff)
             m_primary = standard_params_arr[-1]
             total_mass = 0
             for body_num in np.arange(self.num_secondary_bodies + 1)[2:]:

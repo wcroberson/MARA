@@ -103,7 +103,11 @@ def plot_corner(results, param_list=None, **corner_kwargs):
         'pmdec_com_ref' : 'PMDEC$_{{COM,ref}} [mas/yr]$',
         'rv_com_ref' : 'RV$_{{COM, ref}} [km/s]$',
         'sma_as' : 'sma_{0} $["]$',
-        'epp' : 'epp_{0} [MJD]'
+        'epp' : 'epp_{0} [MJD]',
+        'inc_a' : 'inc_a [mas]',
+        'aop_a' : 'aop_a [mas]',
+        'pan_a' : 'pan_a [mas]',
+        'm*sin(i_a)' : 'm*sin(i_a) [M_E]'
     }
 
     if param_list is None:
