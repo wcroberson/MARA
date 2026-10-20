@@ -902,6 +902,78 @@ class ObsPrior(Prior):
             return 0
 
 
+class RayleighPrior(Prior):
+    """
+    This is the probability distribution :math:`p(x) \\propto (x / \\sigma^2)
+    \\exp(-x^2 / 2\\sigma^2)`.
+
+    The domain of this prior is [0, 1].
+
+    Args:
+        sigma (float): the scale parameter of the Rayleigh distribution
+
+    """
+
+    def __init__(self, sigma):
+        self.sigma = sigma
+        self.dist = scipy.stats.rayleigh(scale=sigma)
+
+    def __repr__(self):
+        return "Rayleigh"
+
+    def transform_samples(self, u):
+        """
+        Transform uniform 1D samples, u, to samples drawn
+        from a Rayleigh distribution.
+
+        Args:
+            u (array of floats): list of samples with values 0 < u < 1.
+
+        Returns:
+            numpy array of floats: 1D u samples transformed to a Rayleigh
+            distribution.
+        """
+        samples = self.dist.ppf(u)
+
+        return samples
+
+    def draw_samples(self, num_samples):
+        """
+        Draw samples from this Rayleigh distribution.
+
+        Args:
+            num_samples (float): the number of samples to generate
+
+        Returns:
+            np.array: samples ranging from [0, 1) as floats.
+        """
+        samples = np.random.uniform(0, 1, num_samples)
+        samples = self.transform_samples(samples)
+
+        return samples
+
+    def compute_lnprob(self, element_array):
+        """
+        Compute the prior probability of each element given that its drawn from this Rayleigh prior
+
+        Args:
+            element_array (float or np.array of float): array of paramters to compute the prior probability of
+
+        Returns:
+            np.array: array of prior probabilities
+        """
+        lnprob = self.dist.logpdf(element_array)
+
+        # account for scalar inputs
+        if np.shape(lnprob) == ():
+            if element_array >= 1.0:
+                lnprob = -np.inf
+        else:
+            lnprob[element_array >= 1.0] = -np.inf
+
+        return lnprob
+
+
 def all_lnpriors(params, priors, check_per=False, param_idx=None, check_sma=False):
     """
     Calculates log(prior probability) of a set of parameters and a list of priors

@@ -235,7 +235,7 @@ class System(object):
                 "epochs": epochs,
             }
 
-        if self.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar']:
+        if self.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar', 'SHERAEM_coplanar_period']:
             self.extra_basis_kwargs["PA"] = self.PA
 
         self.basis = basis_obj(
@@ -420,7 +420,7 @@ class System(object):
 
             raoff, deoff, vz = nbody.calc_orbit(epochs, sma, ecc, inc, argp, lan, tau, plx, mtot, tau_ref_epoch=self.tau_ref_epoch, m_pl=m_pl, output_star=True)
 
-        elif self.fitting_basis != 'SHERAPM':
+        elif not full_orbit_model:
             for body_num in np.arange(self.num_secondary_bodies)+1:
                 sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
                 ecc = params_arr[self.basis.standard_basis_idx['ecc{}'.format(body_num)]]
@@ -855,7 +855,9 @@ class System(object):
             standard_params_arr = self.basis.to_standard_basis(to_convert)
         except TypeError:
             standard_params_arr = self.basis.to_standard_basis(to_convert, self.tau_ref_epoch)
-
+        
+        full_orbit_model = (self.fitting_basis in ['SHERAPM', 'SHERAPM_coplanar'])
+        
         if use_rebound:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, comp_rebound=True,
                                                         use_msinmid_basis=use_msinmid_basis)
@@ -873,7 +875,7 @@ class System(object):
         jitter = np.zeros((n_epochs, 2, n_orbits))
         gamma = np.zeros((n_epochs, 2, n_orbits))
 
-        if self.fitting_basis == 'SHERAPM':
+        if full_orbit_model:  # self.fitting_basis == 'SHERAPM':
             if len(self.rv[0]) > 0 and self.fit_secondary_mass:
                 # looping through instruments to get the gammas & jitters
                 for rv_idx in range(len(self.rv_instruments)):
