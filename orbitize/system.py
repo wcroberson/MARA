@@ -75,7 +75,9 @@ class System(object):
         gaia=None,
         fitting_basis="Standard",
         use_rebound=False,
-        PA=None
+        PA=None,
+        spacecraft_pos=None,
+        spacecraft_vel=None
     ):
         self.num_secondary_bodies = num_secondary_bodies
         self.data_table = data_table
@@ -91,6 +93,8 @@ class System(object):
         self.fitting_basis = fitting_basis
         self.use_rebound = use_rebound
         self.PA = PA
+        self.spacecraft_pos = spacecraft_pos
+        self.spacecraft_vel = spacecraft_vel
 
         self.best_epochs = []
         self.input_table = self.data_table.copy()
@@ -235,8 +239,12 @@ class System(object):
                 "epochs": epochs,
             }
 
-        if self.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar', 'SHERAEM_coplanar_period']:
+        if self.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar', 'SHERAEM_coplanar_period', 'MARA_level1_coplanar', 'MARA_level2_coplanar']:
             self.extra_basis_kwargs["PA"] = self.PA
+        
+        if self.fitting_basis in ['MARA_level1_coplanar']:
+            self.extra_basis_kwargs["spacecraft_pos"] = self.spacecraft_pos
+            self.extra_basis_kwargs["spacecraft_vel"] = self.spacecraft_vel
 
         self.basis = basis_obj(
             self.stellar_or_system_mass, self.mass_err, self.plx, self.plx_err, self.num_secondary_bodies,
@@ -336,9 +344,18 @@ class System(object):
 
         hf.attrs['fitting_basis'] = self.fitting_basis
         hf.attrs['use_rebound'] = self.use_rebound
+        if self.PA is not None:
+            hf.attrs['PA'] = self.PA
+        if self.spacecraft_pos is not None:
+            dt_ep = np.asarray(self.data_table['epoch'], dtype=float)
+            epochs = np.unique(np.concatenate([dt_ep, np.linspace(dt_ep.min(), dt_ep.max(), len(dt_ep)*5)]))
+            sc_pos = (self.basis.spacecraft_pos(epochs) * u.pc).to(u.AU).value
+            sc_vel = self.basis.spacecraft_vel(epochs)
+            hf.create_dataset('spacecraft_pos', data=np.vstack([epochs, sc_pos]))
+            hf.create_dataset('spacecraft_vel', data=np.vstack([epochs, sc_vel]))
 
     def compute_all_orbits(self, params_arr, epochs=None, comp_rebound=False, use_msinmid_basis=False,
-                           full_orbit_model=False, ref_epoch_jyear=2019.5):
+                           full_orbit_model=False, ref_epoch_jyear=2019.5, level1_fit=False):
         """
         Calls orbitize.kepler.calc_orbit and optionally accounts for multi-body
         interactions. Also computes total quantities like RV (without jitter/gamma)
@@ -399,6 +416,8 @@ class System(object):
         if self.track_planet_perturbs:
             masses = np.zeros((self.num_secondary_bodies + 1, n_orbits))
             mtots = np.zeros((self.num_secondary_bodies + 1, n_orbits))
+        
+        level3_fit = not (level1_fit or full_orbit_model)
 
         if comp_rebound or self.use_rebound:
             sma = params_arr[self.sma_indx]
@@ -420,7 +439,7 @@ class System(object):
 
             raoff, deoff, vz = nbody.calc_orbit(epochs, sma, ecc, inc, argp, lan, tau, plx, mtot, tau_ref_epoch=self.tau_ref_epoch, m_pl=m_pl, output_star=True)
 
-        elif not full_orbit_model:
+        elif level3_fit:
             for body_num in np.arange(self.num_secondary_bodies)+1:
                 sma = params_arr[self.basis.standard_basis_idx['sma{}'.format(body_num)]]
                 ecc = params_arr[self.basis.standard_basis_idx['ecc{}'.format(body_num)]]
@@ -491,8 +510,10 @@ class System(object):
             lan = params_arr[self.basis.standard_basis_idx['pan{}'.format(body_num)]]
             tau = params_arr[self.basis.standard_basis_idx['tau{}'.format(body_num)]]
             plx = params_arr[self.basis.standard_basis_idx['plx']]
-            if body_num == 1:
-                sma *= 1 / np.tan(plx / 1000 / my206265) / my206265
+            
+            if full_orbit_model:
+                if body_num == 1:
+                    sma *= 1 / np.tan(plx / 1000 / my206265) / my206265
 
             if self.fit_secondary_mass:
                 # This if statement has been changed with a workaround so
@@ -501,47 +522,54 @@ class System(object):
                 # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
                 mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                 m0 = params_arr[self.basis.standard_basis_idx['m0']]
-
-                if body_num == 1:
-                    tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
-
-                    mass = ((sma**3) / (mass**2)) - m0
-                    if self.num_secondary_bodies > 1:
-                        for i in range(2, self.num_secondary_bodies + 1):
-                            m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
-                            mass -= m
-                    return_inf = True if mass <= 0 else False
-                else:
-                    if use_msinmid_basis:
-                        # Changing basis to fit in period and Msin(mi_d) for the planets
-                        # The following line actually calculates time of conjunction, because it is given tau_conj
-                        t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
-                        epp = timetrans_to_timeperi(t_conj, sma, ecc, argp)
-                        tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
-
-                        mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc) +
-                                         np.sin(np.pi / 2) * np.sin(inc) * np.cos((107.7 * np.pi / 180) - lan))  # 120 degrees is only roughly right, should do it more rigorously
-
-                        mass /= np.sin(mi_d)
-
-                        sma = (sma ** 2 * (mass + m0)) ** (1 / 3)
+                
+                if full_orbit_model:
+                    if body_num == 1:
+                        tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
+    
+                        mass = ((sma**3) / (mass**2)) - m0
+                        if self.num_secondary_bodies > 1:
+                            for i in range(2, self.num_secondary_bodies + 1):
+                                m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
+                                mass -= m
+                        return_inf = True if mass <= 0 else False
                     else:
-                        period = np.sqrt(sma ** 3 / (mass + m0))
-                        # The following line actually calculates time of conjunction, because it is given tau_conj
-                        t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
-                        epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
-                        tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
+                        if use_msinmid_basis:
+                            # Changing basis to fit in period and Msin(mi_d) for the planets
+                            # The following line actually calculates time of conjunction, because it is given tau_conj
+                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
+                            epp = timetrans_to_timeperi(t_conj, sma, ecc, argp)
+                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
+    
+                            mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc) +
+                                             np.sin(np.pi / 2) * np.sin(inc) * np.cos((107.7 * np.pi / 180) - lan))  # 120 degrees is only roughly right, should do it more rigorously
+    
+                            mass /= np.sin(mi_d)
+    
+                            sma = (sma ** 2 * (mass + m0)) ** (1 / 3)
+                        else:
+                            period = np.sqrt(sma ** 3 / (mass + m0))
+                            # The following line actually calculates time of conjunction, because it is given tau_conj
+                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
+                            epp = timetrans_to_timeperi(t_conj, period, ecc, argp)
+                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
+
+                else:
+                    return_inf = False
 
                 all_smas = params_arr[self.sma_indx]
-                all_smas[0] *= 1 / np.tan(plx / 1000 / my206265) / my206265
+                if full_orbit_model:
+                    all_smas[0] *= 1 / np.tan(plx / 1000 / my206265) / my206265
                 within_orbit = np.where(all_smas <= sma)
                 outside_orbit = np.where(all_smas > sma)
                 all_pl_masses = params_arr[self.secondary_mass_indx]
-                all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
+                if full_orbit_model:
+                    all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
                 if self.num_secondary_bodies > 1:
                     for i in range(2, self.num_secondary_bodies + 1):
                         m = params_arr[self.basis.standard_basis_idx['m{}'.format(i)]]
-                        all_pl_masses[0] -= m
+                        if full_orbit_model:
+                            all_pl_masses[0] -= m
                 inside_masses = all_pl_masses[within_orbit]
                 mtot = np.sum(inside_masses) + m0
 
@@ -584,6 +612,11 @@ class System(object):
             x_com_i, y_com_i, z_com_i, dx_com_i, dy_com_i, dz_com_i = radecz2xyz(ra_com_i, dec_com_i,
                                                                                  plx_com_i, pmra_com_i,
                                                                                  pmdec_com_i, rv_com_i)
+            if level1_fit:
+                bc2com = np.stack([x_com_i, y_com_i, z_com_i])
+                bc2sc = self.basis.spacecraft_pos(epochs)
+                n_bc2com = (bc2com / np.linalg.norm(bc2com)).reshape(3, 1)
+                t0 += (((n_bc2com * bc2sc).sum(axis=0) * u.pc) / const.c.to(u.km / u.s)).to(u.day).value
 
             d0 = 1 / np.tan(plx_com_i / 1000 / my206265) / my206265
             ra1, dec1, parallax1, pmra1, pmdec1, rv1 = transform_motion(t0, ra_com_i, dec_com_i,
@@ -707,37 +740,39 @@ class System(object):
                     # mass of secondary bodies are in order from -1-num_bodies until -2 in order.
                     mass = params_arr[self.basis.standard_basis_idx['m{}'.format(body_num)]]
                     m0 = params_arr[self.basis.standard_basis_idx['m0']]
-
-                    if body_num == 1:
-                        tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
-                        mass = ((sma ** 3) / (mass ** 2)) - m0
-                    else:
-                        if use_msinmid_basis:
-                            # Changing basis to fit in period and Msin(mi_d) for the planets
-                            # The following line actually calculates time of conjunction, because it is given tau_conj
-                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
-                            epp = timetrans_to_timeperi(t_conj, sma, ecc, argp)
-                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
-
-                            mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc) +
-                                             np.sin(np.pi / 2) * np.sin(inc) * np.cos((107.7 * np.pi / 180) - lan))  # 120 degrees is only roughly right, should do it more rigorously
-
-                            mass /= np.sin(mi_d)
-
-                            sma = (sma ** 2 * (mass + m0)) ** (1 / 3)
+                    if full_orbit_model:
+                        if body_num == 1:
+                            tau = basis.tp_to_tau(tau, self.tau_ref_epoch, mass)
+                            mass = ((sma ** 3) / (mass ** 2)) - m0
                         else:
-                            period = np.sqrt(sma ** 3 / (mass + m0))
-                            # The following line actually calculates time of conjunction, because it is given tau_conj
-                            t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
-                            epp = timetrans_to_timeperi(t_conj, (period * u.yr).to(u.day).value, ecc, argp)
-                            tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
+                            if use_msinmid_basis:
+                                # Changing basis to fit in period and Msin(mi_d) for the planets
+                                # The following line actually calculates time of conjunction, because it is given tau_conj
+                                t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, sma)
+                                epp = timetrans_to_timeperi(t_conj, sma, ecc, argp)
+                                tau = basis.tp_to_tau(epp, self.tau_ref_epoch, sma)
+    
+                                mi_d = np.arccos(np.cos(np.pi / 2) * np.cos(inc) +
+                                                 np.sin(np.pi / 2) * np.sin(inc) * np.cos((107.7 * np.pi / 180) - lan))  # 120 degrees is only roughly right, should do it more rigorously
+    
+                                mass /= np.sin(mi_d)
+    
+                                sma = (sma ** 2 * (mass + m0)) ** (1 / 3)
+                            else:
+                                period = np.sqrt(sma ** 3 / (mass + m0))
+                                # The following line actually calculates time of conjunction, because it is given tau_conj
+                                t_conj = basis.tau_to_tp(tau, self.tau_ref_epoch, period)
+                                epp = timetrans_to_timeperi(t_conj, (period * u.yr).to(u.day).value, ecc, argp)
+                                tau = basis.tp_to_tau(epp, self.tau_ref_epoch, period)
 
                     all_smas = params_arr[self.sma_indx]
-                    all_smas[0] *= 1000 / plx
+                    if full_orbit_model:
+                        all_smas[0] *= 1000 / plx
                     within_orbit = np.where(all_smas <= sma)
                     outside_orbit = np.where(all_smas > sma)
                     all_pl_masses = params_arr[self.secondary_mass_indx]
-                    all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
+                    if full_orbit_model:
+                        all_pl_masses[0] = ((sma ** 3) / (all_pl_masses[0] ** 2)) - m0
                     inside_masses = all_pl_masses[within_orbit]
                     mtot = np.sum(inside_masses) + m0
                 else:
@@ -794,22 +829,45 @@ class System(object):
                                                                                   orbit_xp[-1, 0, 0]+planet_orbit_xp[-1, 0, 0],
                                                                                   orbit_yp[-1, 0, 0]+planet_orbit_yp[-1, 0, 0],
                                                                                   orbit_zp[-1, 0, 0]+planet_orbit_zp[-1, 0, 0])
+            
+            if level1_fit:
+                x_A, y_A, z_A, dx_A, dy_A, dz_A = radecz2xyz(raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3)
+                x_B, y_B, z_B, dx_B, dy_B, dz_B = radecz2xyz(raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3)
+                bc2A = np.stack([x_A, y_A, z_A])
+                bc2B = np.stack([x_B, y_B, z_B])
+                dbc2A = np.stack([dx_A, dy_A, dz_A])
+                dbc2B = np.stack([dx_B, dy_B, dz_B])
+                bc2sc = self.basis.spacecraft_pos(epochs)
+                sc2A = bc2A - bc2sc
+                sc2B = bc2B - bc2sc
+                dbc2sc = self.basis.spacecraft_vel(epochs)
+                dsc2A = dbc2A - (dbc2sc * u.km / u.s).to(u.pc / u.yr).value
+                dsc2B = dbc2B - (dbc2sc * u.km / u.s).to(u.pc / u.yr).value
+                sc2A_aberrated = calc_aberration(sc2A, dbc2sc)
+                sc2B_aberrated = calc_aberration(sc2B, dbc2sc) # Currently this does not support RV measurements for level 1 fits, this will be added in the future
+                raA3, decA3, parallaxA3, pmraA3, pmdecA3, rvA3 = xyz2radecz(sc2A_aberrated[0, :], sc2A_aberrated[1, :], sc2A_aberrated[2, :], dsc2A[0, :], dsc2A[1, :], dsc2A[2, :])
+                raB3, decB3, parallaxB3, pmraB3, pmdecB3, rvB3 = xyz2radecz(sc2B_aberrated[0, :], sc2B_aberrated[1, :], sc2B_aberrated[2, :], dsc2B[0, :], dsc2B[1, :], dsc2B[2, :])
+                
+                
             raoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
             decoff = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
             vz = np.zeros((n_epochs, self.num_secondary_bodies + 1, n_orbits))
 
             raoff[:, 0, 0] = raA3
-            raoff[:, 1, 0] = raB2
+            raoff[:, 1, 0] = raB3
             decoff[:, 0, 0] = decA3
-            decoff[:, 1, 0] = decB2
+            decoff[:, 1, 0] = decB3
             vz[:, 0, 0] = rvA3
-            vz[:, 1, 0] = rvB2
+            vz[:, 1, 0] = rvB3
+            
+            
             if return_inf:
                 # THIS IS NOT!!! A PERMANENT FIX, NEED TO COME UP WITH A MORE CLEVER WAY OF DOING THIS
                 raoff[:, 0, 0] = np.inf
                 raoff[:, 1, 0] = -np.inf
                 decoff[:, 0, 0] = np.inf
                 decoff[:, 1, 0] = -np.inf
+                
             return raoff, decoff, vz
 
         if self.fitting_basis == 'XYZ':
@@ -856,14 +914,16 @@ class System(object):
         except TypeError:
             standard_params_arr = self.basis.to_standard_basis(to_convert, self.tau_ref_epoch)
         
-        full_orbit_model = (self.fitting_basis in ['SHERAPM', 'SHERAPM_coplanar'])
+        full_orbit_model = (self.fitting_basis in ['SHERAPM', 'SHERAPM_coplanar', 'MARA_level2_coplanar']) # rename to level 2 (or some such)
+        level2_fit = (self.fitting_basis in ['MARA_level2_coplanar'])
+        level1_fit = (self.fitting_basis in ['MARA_level1_coplanar'])
         
         if use_rebound:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, comp_rebound=True,
                                                         use_msinmid_basis=use_msinmid_basis)
         else:
             raoff, decoff, vz = self.compute_all_orbits(standard_params_arr, use_msinmid_basis=use_msinmid_basis,
-                                                        full_orbit_model=full_orbit_model)
+                                                        full_orbit_model=full_orbit_model, level1_fit=level1_fit)
 
         if len(standard_params_arr.shape) == 1:
             n_orbits = 1
@@ -875,7 +935,7 @@ class System(object):
         jitter = np.zeros((n_epochs, 2, n_orbits))
         gamma = np.zeros((n_epochs, 2, n_orbits))
 
-        if full_orbit_model:  # self.fitting_basis == 'SHERAPM':
+        if full_orbit_model or level1_fit:
             if len(self.rv[0]) > 0 and self.fit_secondary_mass:
                 # looping through instruments to get the gammas & jitters
                 for rv_idx in range(len(self.rv_instruments)):
@@ -1368,3 +1428,27 @@ def generate_synthetic_data(
     data_table = read_file(data_table)
 
     return data_table, sma
+    
+    
+def calc_aberration(sc2obj, vel):
+    """
+	This function calculates the apparent vector of an object accounting for aberration due to observer velocity.
+	It can accept an array with many epochs and will return an answer epoch by epoch.
+    """
+    n = sc2obj / np.linalg.norm(sc2obj, axis=0)
+    c = const.c.to(u.km/u.s).value
+    if np.any(np.linalg.norm(vel, axis=0) > c):
+        raise ValueError('Velocity exceeds c.')
+    if np.any(np.linalg.norm(sc2obj, axis=0) == 0):
+        raise ValueError('Vector from spacecraft to object is 0.')
+    v = vel / np.linalg.norm(vel, axis=0)
+    cos_theta = (n * v).sum(axis=0)
+    sin_theta = np.linalg.norm(np.cross(n,v, axis=0), axis=0)
+    vp = (n - cos_theta * v) / sin_theta
+    theta = np.arccos(cos_theta)
+    dtheta = (np.linalg.norm(vel, axis=0) / c) * sin_theta
+    phi = theta - dtheta
+    aberrated_sc2obj = np.cos(phi) * v + np.sin(phi) * vp
+    window = np.where(np.logical_or(sin_theta < 1e-13, np.linalg.norm(vel, axis=0) == 0))[0]
+    aberrated_sc2obj[:, window] = n[:, window]
+    return aberrated_sc2obj

@@ -706,7 +706,8 @@ class MCMC(Sampler):
         self.num_threads = num_threads
 
         # Add attributes to check if special prior function keywords are needed
-        self.check_per = bool(self.system.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar', 'SHERAEM_aligned', 'SHERAEM_coplanar_period'])
+        self.check_per = bool(self.system.fitting_basis in ['SHERAEM', 'SHERAEM_coplanar', 'SHERAEM_aligned', 'SHERAEM_coplanar_period', 
+                                                            'MARA_level1_coplanar', 'MARA_level2_coplanar', 'MARA_level3_coplanar'])
         self.param_idx = deepcopy(self.system.param_idx) if self.check_per else None
         self.check_sma = bool(self.system.num_secondary_bodies > 2)
 

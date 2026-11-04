@@ -55,6 +55,9 @@ class Results(object):
             self.basis = self.system.basis
             self.param_idx = self.system.param_idx
             self.standard_param_idx = self.system.basis.standard_basis_idx
+            self.PA = self.system.PA
+            self.spacecraft_pos = self.system.spacecraft_pos
+            self.spacecraft_vel = self.system.spacecraft_vel
 
     def add_samples(self, orbital_params, lnlikes, curr_pos=None): 
         """
@@ -250,12 +253,17 @@ class Results(object):
         except KeyError:
             # if key does not exist, then it was fit in the standard basis
             fitting_basis = 'Standard'
+        
+        PA = float(hf.attrs['PA']) if 'PA' in hf.attrs else None
+        spacecraft_pos = np.array(hf['spacecraft_pos']) if 'spacecraft_pos' in hf else None
+        spacecraft_vel = np.array(hf['spacecraft_vel']) if 'spacecraft_vel' in hf else None
 
         self.system = orbitize.system.System(
             num_secondary_bodies, data_table, stellar_or_system_mass,
             plx, mass_err, plx_err, restrict_angle_ranges,
             tau_ref_epoch, fit_secondary_mass,
-            hipparcos_IAD, gaia, fitting_basis, use_rebound
+            hipparcos_IAD, gaia, fitting_basis, use_rebound,
+            PA=PA, spacecraft_pos=spacecraft_pos,spacecraft_vel=spacecraft_vel
         )
 
         self.tau_ref_epoch = self.system.tau_ref_epoch
@@ -266,6 +274,9 @@ class Results(object):
         self.basis = self.system.basis
         self.param_idx = self.system.param_idx
         self.standard_param_idx = self.basis.standard_basis_idx
+        self.PA = self.system.PA
+        self.spacecraft_pos = self.system.spacecraft_pos
+        self.spacecraft_vel = self.system.spacecraft_vel
 
         try:
             curr_pos = np.array(hf.get('curr_pos'))
