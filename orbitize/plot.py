@@ -104,9 +104,9 @@ def plot_corner(results, param_list=None, **corner_kwargs):
         'rv_com_ref' : 'RV$_{{COM, ref}} [km/s]$',
         'sma_as' : 'sma_{0} $["]$',
         'epp' : 'epp_{0} [MJD]',
-        'inc_a' : 'inc_a [mas]',
-        'aop_a' : 'aop_a [mas]',
-        'pan_a' : 'pan_a [mas]',
+        'inc_a' : 'inc_a [$^\\circ$]',
+        'aop_a' : 'aop_a [$^\\circ$]',
+        'pan_a' : 'pan_a [$^\\circ$]',
         'm*sin(i_a)' : 'm*sin(i_a) [M_E]'
     }
 
@@ -156,52 +156,6 @@ def plot_corner(results, param_list=None, **corner_kwargs):
 
     figure = corner.corner(samples, **corner_kwargs)
     return figure
-
-
-def plot_delta_rho(results, my_driver, data_table, plot_name):
-    """
-    Creates a plot showing the delta rho results from the MCMC process.
-
-    :param results: results from which to create the result plot
-    :return: matplotlib figure
-    """
-    idx = np.where(results.lnlike == np.max(results.lnlike))
-    best_params = results.post[idx[0][0], :]
-
-    best_model, _ = my_driver.system.compute_model(best_params)
-    best_model = best_model[:, 0]
-
-    epochs = np.array(data_table['epoch'])
-    seps = np.array(data_table['quant1']) * 1000
-    sep_errs = np.array(data_table['quant1_err']) * 1000
-    plot_epochs = Time(epochs, format='mjd').to_value('decimalyear')
-
-    f, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [4, 1]}, sharex=True)
-    a0.errorbar(plot_epochs, seps, sep_errs, ls='', lw=1, color='red')
-
-    idxs = np.random.randint(lr.post.shape[0], size=100)
-
-    for i in idxs:
-        params = results.post[i, :]
-        model, _ = my_driver.system.compute_model(params)
-        model = model[:, 0]
-        a0.plot(plot_epochs, model * 1000, color='lightblue', alpha=0.6)
-
-    a0.plot(plot_epochs, best_model * 1000, color='black', lw=1)
-    f.suptitle('\u0394\u03C1')
-    a1.set_xlabel('Epoch')
-    a0.set_ylabel('\u0394\u03C1 (\u03BCas)')
-    a1.set_ylabel('O-C')
-    a1.errorbar(plot_epochs, seps - (best_model * 1000), sep_errs, ls='', lw=1, color='red')
-    res = seps - (best_model * 1000)
-    for i in idxs:
-        params = results.post[i, :]
-        model, _ = my_driver.system.compute_model(params)
-        model = model[:, 0]
-        a1.plot(plot_epochs, (model - best_model) * 1000, color='lightblue', alpha=0.6)
-
-    plt.subplots_adjust(wspace=0, hspace=0)
-    plt.savefig(plot_name + '.png')
 
 
 def plot_orbits(results, object_to_plot=1, start_mjd=51544.,

@@ -342,11 +342,6 @@ class GaussianPrior(Prior):
 class TruncatedGaussianPrior(Prior):
     """Truncated Gaussian prior.
 
-    .. math::
-
-        \log(p(x|\sigma, \mu, a_{\text{trunc}}, b_{\text{trunc}})) \propto
-        -\frac{(x - \mu)^2}{2\sigma^2} \quad \text{for } x \in [a_{\text{trunc}}, b_{\text{trunc}}]
-
     This represents a Gaussian distribution truncated at `a_trunc` and `b_trunc`.
 
     Args:
@@ -354,8 +349,6 @@ class TruncatedGaussianPrior(Prior):
         sigma (float): Standard deviation of the distribution.
         a_trunc (float): Lower bound of truncation.
         b_trunc (float): Upper bound of truncation.
-
-    (written) Bill Roberson, 2024 (adapted from GaussianPrior code)
     """
 
 
@@ -495,7 +488,7 @@ class LogUniformPrior(Prior):
         Compute the prior probability of each element given that its drawn from a Log-Uniofrm  prior
 
         Args:
-            element_array (float or np.array of float): array of paramters to compute the prior probability of
+            element_array (float or np.array of float): array of parameters to compute the prior probability of
 
         Returns:
             np.array: array of prior probabilities
@@ -571,7 +564,7 @@ class UniformPrior(Prior):
         Compute the prior probability of each element given that its drawn from this uniform prior
 
         Args:
-            element_array (float or np.array of float): array of paramters to compute the prior probability of
+            element_array (float or np.array of float): array of parameters to compute the prior probability of
 
         Returns:
             np.array: array of prior probabilities
@@ -643,7 +636,7 @@ class SinPrior(Prior):
         Compute the prior probability of each element given that its drawn from a sine prior
 
         Args:
-            element_array (float or np.array of float): array of paramters to compute the prior probability of
+            element_array (float or np.array of float): array of parameters to compute the prior probability of
 
         Returns:
             np.array: array of prior probabilities
@@ -904,10 +897,7 @@ class ObsPrior(Prior):
 
 class RayleighPrior(Prior):
     """
-    This is the probability distribution :math:`p(x) \\propto (x / \\sigma^2)
-    \\exp(-x^2 / 2\\sigma^2)`.
-
-    The domain of this prior is [0, 1].
+    Implements a Raliegh Distribution prior
 
     Args:
         sigma (float): the scale parameter of the Rayleigh distribution
@@ -954,10 +944,10 @@ class RayleighPrior(Prior):
 
     def compute_lnprob(self, element_array):
         """
-        Compute the prior probability of each element given that its drawn from this Rayleigh prior
+        Compute the prior probability of each element given that it is drawn from this Rayleigh prior
 
         Args:
-            element_array (float or np.array of float): array of paramters to compute the prior probability of
+            element_array (float or np.array of float): array of parameters to compute the prior probability of
 
         Returns:
             np.array: array of prior probabilities

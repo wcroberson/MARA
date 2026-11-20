@@ -77,7 +77,6 @@ def calc_orbit(
         max_iter (int, optional): maximum number of iterations before switching. Defaults to 100.
         use_c (bool, optional): Use the C solver if configured. Defaults to True
         use_gpu (bool, optional): Use the GPU solver if configured. Defaults to False
-        return_z (bool, optional): If True, returns only the z coordinate and no raoff, deoff, or vz
         return_cartesian (bool, optional): If True, returns raoff, decoff, and zoff, all in a cartesian
             coordinate system. Meant to be used to perform higher order corrections like perspective
             change and speed of light effects.
@@ -145,7 +144,6 @@ def calc_orbit(
         if not np.isscalar(sma): raise ValueError("The Cartesian version of Kepler.calc_orbit currently only supports scalar orbital parameters (not arrays)")
 
         xyz_res = kepler_to_xyz(sma, ecc, inc, aop, pan, tau, mtot, plx, epochs, eanom)
-        # SET RADOT, DEDOT, ZDOT TO THEIR VARIOUS TERMS IN XYZ_RES
         radot = xyz_res[3]
         dedot = xyz_res[4]
         zdot = xyz_res[5]

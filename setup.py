@@ -49,7 +49,7 @@ setup(
     name="orbitize",
     version=get_property("__version__", "orbitize"),
     description="orbitize! Turns imaging data into orbits",
-    url="https://github.com/wcroberson/orbitize4toliman",
+    url="https://github.com/wcroberson/MARA",
     author="",
     author_email="",
     license="BSD",

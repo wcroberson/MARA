@@ -11,7 +11,7 @@ class Basis(abc.ABC):
     """
     Abstract base class for different basis sets. All new basis objects should inherit from
     this class. This class is meant to control how priors are assigned to various basis sets
-    and how conversions are made from the basis sets to the standard keplarian set.
+    and how conversions are made from the basis sets to the standard keplerian set.
 
     Author: Tirth, 2021
     """
@@ -155,9 +155,10 @@ class Basis(abc.ABC):
         else:
             priors_arr.append(self.stellar_or_system_mass)
 
+# Deprecated, use MARA Level 2 bases
 class SHERAPM(Basis):
     '''
-    Standard basis set based upon the 6 standard Keplarian elements: (sma, ecc, inc, aop, pan, tau).
+    Standard basis set based upon the 6 standard Keplerian elements: (sma, ecc, inc, aop, pan, tau).
     Also includes parameters for the proper motion of the system on a given reference epoch, to be
     used with the perspective change and light timing delay corrections.
 
@@ -258,10 +259,10 @@ class SHERAPM(Basis):
         '''
         return param_arr
 
-
+# Deprecated, use MARA Level 2 bases
 class SHERAPM_coplanar(Basis):
     '''
-    Standard basis set based upon the 6 standard Keplarian elements: (sma, ecc, inc, aop, pan, tau).
+    Standard basis set based upon the 6 standard Keplerian elements: (sma, ecc, inc, aop, pan, tau).
     Also includes parameters for the proper motion of the system on a given reference epoch, to be
     used with the perspective change and light timing delay corrections.
 
@@ -375,7 +376,7 @@ class MARA_level1_coplanar(Basis):
     A basis set for MARA Level 1 data, based on the parameterization used in SHERAEM_coplanar.
     Includes parameters for the proper motion of the system on a given reference epoch, to be
     used with the perspective change and light timing delay corrections. This basis assumes the data
-    are given from the spacecraft coordinates, with angular abberation due to spacecraft motion
+    are given from the spacecraft coordinates, with angular aberration due to spacecraft motion
     not removed.
 
     Args:
@@ -393,10 +394,11 @@ class MARA_level1_coplanar(Basis):
         rv (bool): if True, then there is radial velocity data and assign radial velocity priors, if False, then there
             is no radial velocity data and radial velocity priors are not assigned (default: False)
         rv_instruments (np.array): array of unique rv instruments from the originally supplied data (default: None)
-        spacecraft_pos (np.array): a function that returns the 3D position of the spacecraft, in cartesian coordinates with origin at the Solar System barycenter, on the epochs given. 
-                                   instead, a 4xN array can be entered. in this case, the first row is interpretted as the epochs of observation in MJD, the next 3 rows are taken
-                                   as the corresponding XYZ barycenter-to-spacecraft vector, and an np. it is recommended that the exact positions on the data epochs are used.
-                                   The distance should be given in AU
+        spacecraft_pos (function or np.array): a function that returns the 3D position of the spacecraft, in cartesian coordinates with origin at the Solar System barycenter, on the epochs given. 
+                                   instead, a 4xN array can be entered. in this case, the first row is interpreted as the epochs of observation in MJD, the next 3 rows are taken
+                                   as the corresponding XYZ barycenter-to-spacecraft vector, and an interpolation function is created. it is recommended that the exact positions on the 
+                                   data epochs are used if an array is passed.
+                                   The distance should be given in AU for an array, the function should return distnaces in pc
         spacecraft_vel (np.array): same as spacecraft_pos, but with vectors corresponding to the spacecraft velocity (given in km/s)
     '''
 
@@ -420,9 +422,7 @@ class MARA_level1_coplanar(Basis):
     def construct_priors(self):
         '''
         Generates the parameter label array and initializes the corresponding priors for each
-        parameter that's to be sampled. For the standard basis, the parameters common to each
-        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
-        and mass priors are added at the end.
+        parameter that's to be sampled.
 
         Returns:
             tuple:
@@ -505,7 +505,7 @@ class MARA_level1_coplanar(Basis):
         Convert to the standard orbitize basis.
 
         Args:
-            param_arr (np.array of float): RxM array of fitting parameters in the standard basis,
+            param_arr (np.array of float): RxM array of fitting parameters,
                 where R is the number of parameters being fit, and M is the number of orbits. If
                 M=1 (for MCMC), this can be a 1d array.
 
@@ -572,8 +572,6 @@ class MARA_level1_coplanar(Basis):
         # Set secondary mass in param_arr
         param_arr[self.param_idx['P1']] = m1
 
-        return param_arr
-        
         return param_arr
         
         
@@ -611,9 +609,7 @@ class MARA_level2_coplanar(Basis):
     def construct_priors(self):
         '''
         Generates the parameter label array and initializes the corresponding priors for each
-        parameter that's to be sampled. For the standard basis, the parameters common to each
-        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
-        and mass priors are added at the end.
+        parameter that's to be sampled.
 
         Returns:
             tuple:
@@ -696,7 +692,7 @@ class MARA_level2_coplanar(Basis):
         Convert to the standard orbitize basis.
 
         Args:
-            param_arr (np.array of float): RxM array of fitting parameters in the standard basis,
+            param_arr (np.array of float): RxM array of fitting parameters,
                 where R is the number of parameters being fit, and M is the number of orbits. If
                 M=1 (for MCMC), this can be a 1d array.
 
@@ -763,8 +759,6 @@ class MARA_level2_coplanar(Basis):
         # Set secondary mass in param_arr
         param_arr[self.param_idx['P1']] = m1
 
-        return param_arr
-        
         return param_arr
 
 
@@ -914,7 +908,7 @@ class Period(Basis):
 
 class Standard(Basis):
     '''
-    Standard basis set based upon the 6 standard Keplarian elements: (sma, ecc, inc, aop, pan, tau).
+    Standard basis set based upon the 6 standard Keplerian elements: (sma, ecc, inc, aop, pan, tau).
 
     Args:
         stellar_or_system_mass (float): mass of the primary star (if fitting for
@@ -1251,11 +1245,11 @@ class SemiAmp(Basis):
 class SHERAEM(Basis):
     '''
         Standard basis set to be used for SHERA easy mode orbit fits. The basis uses a variation of the 6 standard
-        Keplarian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
+        Keplerian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
         plx is needed to convert and tau is replaced with epp. For the planets the only difference is that tau is
-        replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calcualted
-        with the epoch at which the planet's PA is at a set point, which should be set to be 90 degrees offset from
-        the PA of the secondary during the observing window (this is done to tau0 corresponds to the time when the
+        replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calculated
+        with the epoch at which the planet's PA is at a set point, which should be set to be ~90 degrees offset from
+        the PA of the secondary during the observing window (this is done to taupa corresponds to the time when the
         delta sep curve passes 0, making it similar to time of conjunction for RV orbit fits). For masses, the planetary
         masses are given in Earth masses, while stellar mass is given in solar masses.
 
@@ -1285,9 +1279,7 @@ class SHERAEM(Basis):
     def construct_priors(self):
         '''
         Generates the parameter label array and initializes the corresponding priors for each
-        parameter that's to be sampled. For the standard basis, the parameters common to each
-        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
-        and mass priors are added at the end.
+        parameter that's to be sampled.
 
         Returns:
             tuple:
@@ -1422,7 +1414,7 @@ class SHERAEM(Basis):
 
         return param_arr
 
-
+# Deprecated
 class SHERAEM_aligned(Basis):
     '''
         New and improved standard basis for SHERA easy-mode fits. It uses a modified set of angles for the planet
@@ -1454,9 +1446,7 @@ class SHERAEM_aligned(Basis):
     def construct_priors(self):
         '''
         Generates the parameter label array and initializes the corresponding priors for each
-        parameter that's to be sampled. For the standard basis, the parameters common to each
-        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
-        and mass priors are added at the end.
+        parameter that's to be sampled.
 
         Returns:
             tuple:
@@ -1620,9 +1610,9 @@ class SHERAEM_aligned(Basis):
 class SHERAEM_coplanar(Basis):
     '''
         Standard basis set to be used for SHERA easy mode orbit fits. The basis uses a variation of the 6 standard
-        Keplarian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
+        Keplerian elements (sma, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
         plx is needed to convert and tau is replaced with epp. For the planets the only difference is that tau is
-        replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calcualted
+        replaced with tau0, which is the equivalent of tau, but instead of being calculated with epp it is calculated
         with the epoch at which the planet's PA is at a set point, which should be set to be 90 degrees offset from
         the PA of the secondary during the observing window (this is done to tau0 corresponds to the time when the
         delta sep curve passes 0, making it similar to time of conjunction for RV orbit fits). For masses, the planetary
@@ -1654,9 +1644,7 @@ class SHERAEM_coplanar(Basis):
     def construct_priors(self):
         '''
         Generates the parameter label array and initializes the corresponding priors for each
-        parameter that's to be sampled. For the standard basis, the parameters common to each
-        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
-        and mass priors are added at the end.
+        parameter that's to be sampled.
 
         Returns:
             tuple:
@@ -1799,9 +1787,9 @@ class SHERAEM_coplanar(Basis):
 class SHERAEM_coplanar_period(Basis):
     '''
         Equivalent to the SHERAEM_coplanar basis, but fitting planet period rather than semimajor axis. The basis uses a variation of the 6 standard
-        Keplarian elements (per, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
+        Keplerian elements (per, ecc, inc, aop, pan, tau). For the binary orbit sma is given in arcseconds and
         plx is needed to convert and tau is replaced with epp. For the planets the only difference is that tau is
-        replaced with tau_pa, which is the equivalent of tau, but instead of being calculated with epp it is calcualted
+        replaced with tau_pa, which is the equivalent of tau, but instead of being calculated with epp it is calculated
         with the epoch at which the planet's PA is at a set point, which should be set to be ~90 degrees offset from
         the PA of the secondary during the observing window (this is done so tau_pa corresponds to the time when the
         delta sep curve passes 0, making it similar to time of conjunction for RV orbit fits). For masses, the planetary
@@ -1833,9 +1821,7 @@ class SHERAEM_coplanar_period(Basis):
     def construct_priors(self):
         '''
         Generates the parameter label array and initializes the corresponding priors for each
-        parameter that's to be sampled. For the standard basis, the parameters common to each
-        companion are: sma, ecc, inc, aop, pan, tau. Parallax, hipparcos (optional), rv (optional),
-        and mass priors are added at the end.
+        parameter that's to be sampled.
 
         Returns:
             tuple:

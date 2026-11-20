@@ -1,5 +1,4 @@
 import numpy as np
-import pdb
 
 """
 This module contains functions for computing log(likelihood).
@@ -68,7 +67,6 @@ i
             # including the second term of chi2
             # the sqrt() in the log() means we don't need to multiply by 0.5
             chi2 = -0.5 * residual**2 / sigma2 - np.log(np.sqrt(2*np.pi*sigma2))
-            #print(np.nansum(chi2))
         else:
             has_no_corr = np.isnan(corrs)
             yes_corr = np.where(~has_no_corr)[0]
