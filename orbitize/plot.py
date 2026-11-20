@@ -76,25 +76,38 @@ def plot_corner(results, param_list=None, **corner_kwargs):
         'aop': '$\\omega_{0}$ [$^\\circ$]',
         'pan': '$\\Omega_{0}$ [$^\\circ$]',
         'tau': '$\\tau_{0}$',
+        'taupa': '$\\tau_{{PA,{0}}}$',
         'plx': '$\\pi$ [mas]',
         'gam': '$\\gamma$ [km/s]',
         'sig': '$\\sigma$ [km/s]',
         'mtot': '$M_T$ [M$_{{\\odot}}$]',
         'm0': '$M_0$ [M$_{{\\odot}}$]',
-        'm': '$M_{0}$ [M$_{{\\rm Solar Mass}}$]',
         'pm_ra': '$\\mu_{{\\alpha}}$ [mas/yr]',
         'pm_dec': '$\\mu_{{\\delta}}$ [mas/yr]',
         'alpha0': '$\\alpha^{{*}}_{{0}}$ [mas]',
         'delta0': '$\\delta_0$ [mas]',
-        'm': '$M_{0}$ [M$_{{\\rm Jup}}$]',
+        'm': '$M_{0}$ [M$_{{\\oplus}}$]',
+        'M': '$M_{0}$ [M$_{{\\odot}}$]',
         'per' : '$P_{0}$ [yr]',
+        'P' : '$P_{0}$ [yr]',
         'K' : '$K_{0}$ [km/s]',
         'x' : '$X_{0}$ [AU]',
         'y' : '$Y_{0}$ [AU]',
         'z' : '$Z_{0}$ [AU]',
         'xdot' : '$xdot_{0}$ [km/s]',
         'ydot' : '$ydot_{0}$ [km/s]',
-        'zdot' : '$zdot_{0}$ [km/s]'
+        'zdot' : '$zdot_{0}$ [km/s]',
+        'ra_com_ref' : 'RA$_{{COM,ref}} [deg]$',
+        'dec_com_ref' : 'Dec$_{{COM,ref}} [deg]$',
+        'pmra_com_ref' : 'PMRA$^{{*}}_{{COM,ref}} [mas/yr]$',
+        'pmdec_com_ref' : 'PMDEC$_{{COM,ref}} [mas/yr]$',
+        'rv_com_ref' : 'RV$_{{COM, ref}} [km/s]$',
+        'sma_as' : 'sma_{0} $["]$',
+        'epp' : 'epp_{0} [MJD]',
+        'inc_a' : 'inc_a [$^\\circ$]',
+        'aop_a' : 'aop_a [$^\\circ$]',
+        'pan_a' : 'pan_a [$^\\circ$]',
+        'm*sin(i_a)' : 'm*sin(i_a) [M_E]'
     }
 
     if param_list is None:
@@ -118,7 +131,6 @@ def plot_corner(results, param_list=None, **corner_kwargs):
     samples = np.copy(results.post[:, param_indices])  # keep only chains for selected parameters
     samples[:, angle_indices] = np.degrees(
         samples[:, angle_indices])  # convert angles from rad to deg
-    #samples[:, secondary_mass_indices] *= u.solMass.to(u.jupiterMass) # convert to Jupiter masses for companions
 
     if 'labels' not in corner_kwargs:  # use default labels if user didn't already supply them
         reduced_labels_list = []
@@ -130,7 +142,7 @@ def plot_corner(results, param_list=None, **corner_kwargs):
             elif label_key == 'm0' or label_key == 'mtot' or label_key.startswith('plx'):
                 body_num = ""
                 # maintain original label key
-            elif label_key in ['pm_ra', 'pm_dec', 'alpha0', 'delta0']:
+            elif label_key in ['pm_ra', 'pm_dec', 'alpha0', 'delta0', 'ra_com_ref', 'dec_com_ref', 'pmra_com_ref', 'pmdec_com_ref', 'rv_com_ref']:
                 body_num = ""
             elif label_key.startswith("gamma") or label_key.startswith("sigma"):
                 body_num = ""
@@ -144,6 +156,7 @@ def plot_corner(results, param_list=None, **corner_kwargs):
 
     figure = corner.corner(samples, **corner_kwargs)
     return figure
+
 
 def plot_orbits(results, object_to_plot=1, start_mjd=51544.,
                 num_orbits_to_plot=100, num_epochs_to_plot=100,

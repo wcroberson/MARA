@@ -55,6 +55,9 @@ class Results(object):
             self.basis = self.system.basis
             self.param_idx = self.system.param_idx
             self.standard_param_idx = self.system.basis.standard_basis_idx
+            self.PA = self.system.PA
+            self.spacecraft_pos = self.system.spacecraft_pos
+            self.spacecraft_vel = self.system.spacecraft_vel
 
     def add_samples(self, orbital_params, lnlikes, curr_pos=None): 
         """
@@ -211,31 +214,56 @@ class Results(object):
             renormalize_errors = bool(hf.attrs['renormalize_errors'])
 
             hipparcos_IAD = orbitize.hipparcos.HipparcosLogProb(
-                tmpfile, hip_num, alphadec0_epoch, renormalize_errors
+                tmpfile,
+                hip_num,
+                num_secondary_bodies,
+                alphadec0_epoch,
+                renormalize_errors,
             )
 
             os.system('rm {}'.format(tmpfile))
+
+            # load Gaia data
             try:
                 gaia_num = int(hf.attrs['gaia_num'])
                 dr = str(hf.attrs['dr'])
                 gaia = orbitize.gaia.GaiaLogProb(gaia_num, hipparcos_IAD, dr)
             except KeyError:
                 gaia = None
+
+            # alternatively load HGCA. Note requires hipparcos_IAD attribute
+            gaiagost_data = hf.get("Gaia_GOST")
+            if gaiagost_data is not None:
+                
+                tmpfile = 'thisisprettyhackysorrylmao'
+                tmptbl = table.Table(np.array(gaiagost_data))
+                tmptbl.write(tmpfile, format="ascii", overwrite=True)
+
+                gaia = orbitize.gaia.HGCALogProb(int(hip_num), hipparcos_IAD, tmpfile)
+                hipparcos_IAD = None # HGCA handles hipparocs, so don't want to pass Hipparcos also into the system
+
+                os.system('rm {}'.format(tmpfile))
         else:
             hipparcos_IAD = None
             gaia = None
+
 
         try:
             fitting_basis = str(hf.attrs['fitting_basis'])
         except KeyError:
             # if key does not exist, then it was fit in the standard basis
             fitting_basis = 'Standard'
+        
+        PA = float(hf.attrs['PA']) if 'PA' in hf.attrs else None
+        spacecraft_pos = np.array(hf['spacecraft_pos']) if 'spacecraft_pos' in hf else None
+        spacecraft_vel = np.array(hf['spacecraft_vel']) if 'spacecraft_vel' in hf else None
 
         self.system = orbitize.system.System(
             num_secondary_bodies, data_table, stellar_or_system_mass,
             plx, mass_err, plx_err, restrict_angle_ranges,
             tau_ref_epoch, fit_secondary_mass,
-            hipparcos_IAD, gaia, fitting_basis, use_rebound
+            hipparcos_IAD, gaia, fitting_basis, use_rebound,
+            PA=PA, spacecraft_pos=spacecraft_pos,spacecraft_vel=spacecraft_vel
         )
 
         self.tau_ref_epoch = self.system.tau_ref_epoch
@@ -246,6 +274,9 @@ class Results(object):
         self.basis = self.system.basis
         self.param_idx = self.system.param_idx
         self.standard_param_idx = self.basis.standard_basis_idx
+        self.PA = self.system.PA
+        self.spacecraft_pos = self.system.spacecraft_pos
+        self.spacecraft_vel = self.system.spacecraft_vel
 
         try:
             curr_pos = np.array(hf.get('curr_pos'))
@@ -289,13 +320,13 @@ class Results(object):
                 raise Exception(
                     'Unable to load file {} to Results object. append is set to False but object is not empty'.format(filename))
 
-    def print_results(self):
+    def print_results(self, file=None):
         """
         Prints median and 68% credible intervals alongside fitting labels
         """
 
-        print('\nparam: med [68% CI]')
-        print('-------------------\n')
+        print('\nparam: med [68% CI]', file=file)
+        print('-------------------\n', file=file)
         for i, l in enumerate(self.system.labels):
             print(
                 '{}: {:.3f} [{:.3f} - {:.3f}]'.format(
@@ -303,9 +334,10 @@ class Results(object):
                     np.median(self.post[:,i]),
                     np.quantile(self.post[:,i], 0.16),
                     np.quantile(self.post[:,i], 0.84)
-                )
+                ),
+                file=file
             )
-        print('-------------------\n')
+        print('-------------------\n', file=file)
     
     def plot_corner(self, param_list=None, **corner_kwargs):
         """
@@ -320,7 +352,7 @@ class Results(object):
         cbar_param='Epoch [year]', mod180=False, rv_time_series=False, 
         plot_astrometry=True,
         plot_astrometry_insts=False,
-        plot_errorbars=True, fig=None
+        fig=None
     ):
         """
         Wrapper for orbitize.plot.plot_orbits
@@ -335,8 +367,5 @@ class Results(object):
             cbar_param=cbar_param, mod180=mod180, rv_time_series=rv_time_series, 
             plot_astrometry=plot_astrometry,
             plot_astrometry_insts=plot_astrometry_insts, 
-            plot_errorbars=plot_errorbars, fig=fig
+            fig=fig
         )
-
-
-
