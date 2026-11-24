@@ -1,0 +1,25 @@
+Planet detection files:
+
+These data are in examples/data_and_param_files/planet_detection/. 1planet_datasets.txt and 2planet_datasets.txt each hold 10,000 simulated datasets, one per row, as the separation change (arcsec) at the epochs in 1planet_epochs.txt and 2planet_epochs.txt (days after MJD 60467).
+
+Planet detection command:
+
+python examples/scripts/mara_planet_detection.py examples/data_and_param_files/planet_detection/1planet_datasets.txt examples/data_and_param_files/planet_detection/1planet_epochs.txt {ROW}
+
+
+Level 3 planet characterization files:
+
+These data are in examples/data_and_param_files/level3/, with filenames formatted like 1planet_15.csv, and their parameter files are formatted like 1planet_15_params.csv. The MCMC data files are numbered according to the corresponding index of the Level 3 data in the planet detection data file. So, 1planet_15.csv would correspond to row 15 of examples/data_and_param_files/planet_detection/1planet_datasets.txt.
+
+Level 3 planet characterization command:
+
+python examples/scripts/mara_level3_fit.py examples/data_and_param_files/level3/1planet_{ROW}.csv examples/data_and_param_files/level3/1planet_{ROW}_params.csv --num_temps 30 --num_walkers 280 --num_steps {NUM_STEPS} --burn_steps {BURN_STEPS} --PA 110 --coplanar --save_name 1planet_{ROW}
+
+
+Level 2 planet characterization files:
+
+These data are in examples/data_and_param_files/level2/, with filenames formatted like level2_01.csv, and their parameter files are formatted like level2_01_params.csv. The same 12 planets as Level 3 data are in the same folder, formatted like level3_comparison_01.csv and level3_comparison_01_params.csv, and are fit with the Level 3 command.
+
+Level 2 planet characterization command:
+
+python examples/scripts/mara_level2_fit.py examples/data_and_param_files/level2/level2_{N}.csv examples/data_and_param_files/level2/level2_{N}_params.csv --num_temps 30 --num_walkers 280 --num_steps {NUM_STEPS} --burn_steps {BURN_STEPS} --PA 110 --coplanar --save_name level2_{N}
