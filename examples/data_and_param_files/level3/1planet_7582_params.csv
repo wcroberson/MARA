@@ -1,0 +1,5 @@
+Object,sma (arcsec),sma_sig (arcsec),ecc,ecc_sig,inc (deg),inc_sig (deg),aop (deg),aop_sig (deg),pan (deg),pan_sig (deg),epp (MJD),epp_sig (days),mass (M_sol),mass_sig (M_sol),period (years),period_sig (years),plx (mas),plx_sig (mas)
+A,17.493,0.0096,0.51947,0.00015,79.243,0.0089,51.519,0.027,205.073,0.025,35313.86,5.47875,1.0788,0.0029,79.762,0.019,750.81,0.38
+B,17.493,0.0096,0.51947,0.00015,79.243,0.0089,231.519,0.027,205.073,0.025,35313.86,5.47875,0.9092,0.0025,79.762,0.019,,
+Planet,sma (AU),sma_sig (AU),ecc,ecc_sig,inc (deg),inc_sig (deg),aop (deg),aop_sig (deg),pan (deg),pan_sig (deg),tau,tau_sig,mass (M_sol),mass_sig (M_sol),period (years),period_sig (years),,
+planet 1,1.0174067049188762,0.04890827116790671,-999,-999,-999,-999,-999,-999,-999,-999,0.42611074930596043,0.1,2.021485591416361,0.1,-999,-999,,
